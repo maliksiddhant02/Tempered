@@ -9,7 +9,10 @@ that silent success. It is the reason agents lie about results that never happen
 
 *A two-minute walkthrough will be linked here once recorded.*
 
-Live deployment: *URL added after Render deploy.*
+Live deployment: <https://tempered.onrender.com/>
+
+The free tier sleeps after 15 minutes of inactivity; the first request wakes it
+and can take about 30 seconds.
 
 ## What Tempered does
 
