@@ -1,29 +1,51 @@
 # Tempered
 
-An agent that posts your updates across Discord, Slack, GitHub, and Notion, over
-connectors it tests before it trusts them.
+Build any AI tool from a sentence. Describe what you want, and Tempered writes a
+working MCP server for it, hands the tools to an agent you can chat with, then
+attacks each tool to check it doesn't quietly lie.
+
+Here's the problem it exists for. An MCP server can accept bad input and still
+reply as if the call worked, so the agent trusts a result that never happened. We
+call that a silent success. Tempered builds the server, sends malformed input at
+every tool, grades what the tool catches, and rewrites the ones that let junk
+through.
 
 ## 01 · Project overview
 
-Tell it what's new. It drafts a post for each platform, you confirm, it publishes.
+`python -m tempered.cli serve` starts a local web app with two pages. The landing
+page explains the idea. The live demo is where the work happens, and there are
+three ways to get a server:
 
-The catch with pointing an agent at real apps: an MCP connector can take malformed
-input and still return success, so the agent acts on garbage and nothing errors. We
-call that a silent success. Tempered's engine builds each connector from an API
-spec, attacks it with bad input, grades it, and repairs it, so the agent only uses
-connectors that pass.
+- Describe it in plain English, like "a Slack poster that sends to a webhook", and
+  Claude writes the MCP server.
+- Paste an OpenAPI URL and Tempered generates the server from the spec.
+- Load one of eight ready-made presets in a single click.
+
+Once a server exists, chat with an agent that holds its tools. Ask for something
+and the agent picks a tool, calls the API, and answers. Then open Verify to scan
+the server with adversarial input, read its grade, and repair whatever fails.
+
+It all runs on your machine. Keys stay in the process memory or your `.env`. They
+are never written to disk from the browser and never sent back to the page.
 
 ## 02 · External apps used
 
-| App | Connector | Action |
-|---|---|---|
-| Discord | generated from an OpenAPI spec | post via incoming webhook |
-| Slack | generated from an OpenAPI spec | post via incoming webhook |
-| GitHub | generated from an OpenAPI spec | open an issue (REST API) |
-| Notion | hand-written adapter | append to a page |
+Eight presets load straight into chat, and most need no key.
 
-Simple key/webhook auth, no OAuth. Keys are yours: entered in the UI, kept in
-memory. Closed apps (LinkedIn, Seek, Prosple) get a draft you paste yourself.
+| Preset | Key needed | Try |
+|---|---|---|
+| Open-Meteo, weather | none | "what's the weather in Tokyo?" |
+| CoinGecko, crypto prices | none | "price of bitcoin and ethereum in usd" |
+| NASA, astronomy photo | none (falls back to DEMO_KEY) | "show the picture for 2024-01-01" |
+| Pollinations, AI image and text | none | "generate an image of a fox in a spacesuit" |
+| GitHub, REST API | reads work without one | "find popular python repos" |
+| Unsplash, photo search | Unsplash access key | "find 5 photos of mountains" |
+| Discord, post via webhook | a Discord webhook | "post 'hello team' to discord" |
+| Petstore, OpenAPI demo | none | generates a server that scores F, then Repair takes it to A |
+
+For anything outside this list, describe it or paste its OpenAPI URL. Keys go in
+the in-page Keys panel or your `.env`, and they stay in memory. GraphQL and closed
+apps (LinkedIn, Seek, Prosple) aren't generated; you draft those by hand.
 
 ## 03 · Setup instructions
 
@@ -33,9 +55,9 @@ python -m venv .venv
 python -m tempered.cli serve
 ```
 
-Open <http://127.0.0.1:8000>, paste your Anthropic key and a Discord webhook under
-**Connections & keys**, type what's new, hit **Draft**, then **Publish approved**.
-**Prove** grades a connector; **Harden** repairs a failing one.
+Open <http://127.0.0.1:8000>. Add your Anthropic key to `.env` (see `.env.example`)
+or paste it in the Keys panel, then describe a tool or load a preset. Chat uses
+`claude-sonnet-4-6`.
 
 ## 04 · Reliability testing
 
@@ -50,32 +72,43 @@ python test_tempered.py
   write safety     POST skipped by default, scanned with --allow-writes
 ```
 
-For each tool's schema, Tempered sends one payload per rule, each breaking exactly
-one thing (wrong type, missing field, over the length limit, a stray key). A proper
-error is a pass; a success reply to bad input is a silent success, the bug we hunt.
-The pass rate becomes a grade, A to F.
+For each tool's schema, Tempered sends one payload per rule, and each payload
+breaks exactly one thing: a wrong type, a missing field, a value past the length
+limit, a stray key. A clear error is a pass. A success reply to bad input is a
+silent success, the bug we hunt. The pass rate becomes a grade from A to F.
 
-It caught a real one. FastMCP's generated connectors don't enforce their schemas,
-so Discord, Slack, and GitHub score F; the hand-written Notion one validates and
-scores A. `repair` rewrites a failing connector to validate its input, taking it
-from F to A in one pass while it still publishes valid posts. The harness stays
-honest too: a known-good server must score A, sensible coercions are unscored,
-unreachable tools get no grade, and adversarial writes hit a local sink during
-testing, never the real API.
+It catches real ones. FastMCP's generated servers don't enforce their own schemas,
+so a fresh connector scores F. Repair rewrites it to validate input and runs the
+scan again, usually moving it from F to A in one pass while it still handles valid
+calls. The harness stays honest too: a known-good server has to score A, sensible
+type coercions aren't counted against a tool, unreachable tools get no grade, and
+adversarial writes hit a local sink during testing instead of the real API.
+
+The same check runs from the command line as a CI gate:
+
+```bash
+python -m tempered.cli test python path/to/server.py --fail-under B
+```
+
+It exits nonzero below the grade you set, so a regression in a spec fails the build.
 
 ## 05 · Demo video
 
-▶ **[Add your ≤2-minute link here]** — walkthrough in [DEMO.md](DEMO.md).
+A two-minute walkthrough link goes here once it's recorded. Notes are in
+[DEMO.md](DEMO.md).
 
 ## Repo
 
-`presence/` is the agent (draft, confirm, publish); `tempered/` is the engine
-(`synth` → `scan` → `repair` → `generate`, plus `web`/`cli`). `test_tempered.py` is
-the self-check. Connectors ship at F so the demo can harden them live;
-`git checkout presence/connectors` resets them. Limits: one call per tool, OpenAPI
-in (GraphQL and closed apps are draft-only), no OAuth.
+- `tempered/` is the engine (`synth`, `scan`, `repair`, `generate`) plus the web
+  app (`web`) and the CLI (`cli`).
+- `tempered/static/` holds the website: the landing page and the live demo.
+- `presence/` is an earlier agent that drafts and posts updates across Discord,
+  Slack, GitHub, and Notion.
+- `test_tempered.py` is the self-check.
+
+Limits: one call per tool during a scan, OpenAPI in, and no OAuth.
 
 ## Team
 
-- peter.ma3@hotmail.com
-<!-- add the rest of the team here and in the submission form -->
+- Siddhant Malik, co-founder (maliksiddhant02@gmail.com)
+- Peter Ma, co-founder (peter.ma3@hotmail.com)
