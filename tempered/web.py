@@ -155,7 +155,7 @@ async def api_repair(request: Request) -> EventSourceResponse:
 # dev tool, which is the only thing this server is meant to be.
 PRESENCE_KEYS = (
     "ANTHROPIC_API_KEY", "DISCORD_WEBHOOK_URL", "SLACK_WEBHOOK_URL",
-    "NOTION_TOKEN", "NOTION_PAGE_ID", "GITHUB_TOKEN",
+    "GITHUB_TOKEN", "GITHUB_REPO", "NOTION_TOKEN", "NOTION_PAGE_ID",
 )
 
 
@@ -177,7 +177,7 @@ async def api_presence_keys(request: Request) -> JSONResponse:
 
 async def api_presence_plan(request: Request) -> JSONResponse:
     """Draft tailored posts. Executes nothing — returns proposals to confirm."""
-    from presence.agent import plan
+    from presence.agent import CONNECTORS, plan
 
     body = await request.json()
     whats_new = (body.get("whats_new") or "").strip()
@@ -190,12 +190,17 @@ async def api_presence_plan(request: Request) -> JSONResponse:
         proposals, notes = await plan(whats_new, platforms)
     except Exception as exc:  # noqa: BLE001 - surface the reason to the UI
         return JSONResponse({"error": f"{type(exc).__name__}: {exc}"}, status_code=400)
-    return JSONResponse({
-        "notes": notes,
-        "proposals": [
-            {"platform": p.platform, "label": p.label, "content": p.content} for p in proposals
-        ],
-    })
+
+    def serialize(p: Any) -> dict[str, Any]:
+        return {
+            "platform": p.platform, "label": p.label,
+            "fields": [
+                {"name": f.name, "label": f.label, "limit": f.limit, "value": p.values.get(f.name, "")}
+                for f in CONNECTORS[p.platform].fields
+            ],
+        }
+
+    return JSONResponse({"notes": notes, "proposals": [serialize(p) for p in proposals]})
 
 
 async def api_presence_publish(request: Request) -> JSONResponse:
@@ -204,9 +209,9 @@ async def api_presence_publish(request: Request) -> JSONResponse:
 
     body = await request.json()
     proposals = [
-        Proposal(platform=i["platform"], content=i["content"])
+        Proposal(platform=i["platform"], values={k: str(v) for k, v in (i.get("values") or {}).items()})
         for i in (body.get("proposals") or [])
-        if str(i.get("content", "")).strip()
+        if any(str(v).strip() for v in (i.get("values") or {}).values())
     ]
     if not proposals:
         return JSONResponse({"error": "Nothing to publish."}, status_code=400)

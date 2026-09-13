@@ -16,6 +16,7 @@ injected here from the environment (BYO keys) and are never shown to the model.
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import re
 import sys
@@ -33,27 +34,33 @@ SYSTEM = """You help a professional keep their public presence up to date.
 
 The user tells you what is new — a shipped project, a talk, an award, a new role.
 For EACH target platform, write one update tailored to that platform and call
-that platform's post tool with the final text. Tailor tone and length: a dev
-community (Discord/Slack) is warmer and shorter; GitHub and a profile page are
-more formal.
+that platform's post tool with the finished text in every field it asks for.
+Tailor tone and length: a dev community (Discord/Slack) is warmer and shorter;
+GitHub and a profile page are more formal.
 
 Hard rules:
-- Use ONLY facts the user gave you. Never invent metrics, dates, names, or
-  outcomes. If something is unclear, write the honest, smaller version.
+- Use ONLY facts the user gave you. Never invent metrics, dates, names, links,
+  or outcomes. If something is unclear, write the honest, smaller version.
 - One post per requested platform. Call each tool exactly once.
 - After you have called the tool for every requested platform, stop.
 """
 
 
 @dataclass(frozen=True)
+class Field:
+    name: str            # the argument name on the connector's tool
+    label: str           # human label for the UI
+    limit: int           # max characters, surfaced to the model and enforced
+
+
+@dataclass(frozen=True)
 class Connector:
     platform: str
     label: str
-    server: str            # generated MCP server that does the real request
-    tool: str              # the MCP tool name inside it
-    draft_field: str       # which tool argument carries the drafted text
-    limit: int             # max characters, surfaced to the model and checked
-    style: str             # tone guidance for the model
+    server: str                       # generated MCP server that does the real request
+    tool: str                         # the MCP tool name inside it
+    fields: tuple[Field, ...]         # the parts the MODEL drafts
+    style: str                        # tone guidance for the model
     secrets: Callable[[], dict[str, Any]]   # BYO creds -> extra tool args (raises if missing)
     env: Callable[[], dict[str, str]] = field(default=lambda: {})  # extra process env
 
@@ -66,7 +73,7 @@ def _need(var: str) -> str:
 
 
 def _discord_secrets() -> dict[str, Any]:
-    # The webhook URL is https://discord.com/api/webhooks/<id>/<token>
+    # https://discord.com/api/webhooks/<id>/<token>
     url = _need("DISCORD_WEBHOOK_URL")
     m = re.search(r"/webhooks/([^/]+)/([^/?#]+)", url)
     if not m:
@@ -83,26 +90,43 @@ def _slack_secrets() -> dict[str, Any]:
     return {"t1": m.group(1), "t2": m.group(2), "t3": m.group(3)}
 
 
+def _github_secrets() -> dict[str, Any]:
+    repo = _need("GITHUB_REPO")  # "owner/name"
+    if "/" not in repo:
+        raise MissingCredentials("GITHUB_REPO must look like owner/name")
+    owner, name = repo.split("/", 1)
+    return {"owner": owner, "repo": name}
+
+
+def _github_env() -> dict[str, str]:
+    return {
+        "API_TOKEN": _need("GITHUB_TOKEN"),
+        "API_HEADERS": json.dumps({"Accept": "application/vnd.github+json"}),
+    }
+
+
 CONNECTORS: dict[str, Connector] = {
     "discord": Connector(
-        platform="discord",
-        label="Discord",
+        platform="discord", label="Discord",
         server=str(ROOT / "connectors" / "discord_server.py"),
-        tool="post_update",
-        draft_field="content",
-        limit=2000,
+        tool="post_update", fields=(Field("content", "Message", 2000),),
         style="Warm, concise, first person. An emoji or two is fine. No hashtag spam.",
         secrets=_discord_secrets,
     ),
     "slack": Connector(
-        platform="slack",
-        label="Slack",
+        platform="slack", label="Slack",
         server=str(ROOT / "connectors" / "slack_server.py"),
-        tool="post_update",
-        draft_field="text",
-        limit=3000,
+        tool="post_update", fields=(Field("text", "Message", 3000),),
         style="Team-channel tone: friendly and concise, first person.",
         secrets=_slack_secrets,
+    ),
+    "github": Connector(
+        platform="github", label="GitHub",
+        server=str(ROOT / "connectors" / "github_server.py"),
+        tool="create_issue",
+        fields=(Field("title", "Issue title", 120), Field("body", "Issue body", 4000)),
+        style="Formal changelog/announcement tone. Markdown is welcome in the body.",
+        secrets=_github_secrets, env=_github_env,
     ),
 }
 
@@ -110,7 +134,7 @@ CONNECTORS: dict[str, Connector] = {
 @dataclass
 class Proposal:
     platform: str
-    content: str
+    values: dict[str, str]           # field name -> drafted text
     tool_use_id: str = ""
 
     @property
@@ -130,16 +154,14 @@ class Result:
 
 
 def _anthropic_tool(c: Connector) -> dict[str, Any]:
+    props = {
+        f.name: {"type": "string", "description": f"{f.label} (max {f.limit} characters)."}
+        for f in c.fields
+    }
     return {
         "name": f"post_to_{c.platform}",
-        "description": f"Publish the update to {c.label}. {c.style} Max {c.limit} characters.",
-        "input_schema": {
-            "type": "object",
-            "required": ["content"],
-            "properties": {
-                "content": {"type": "string", "description": f"The final post text for {c.label}."}
-            },
-        },
+        "description": f"Publish the update to {c.label}. {c.style}",
+        "input_schema": {"type": "object", "required": [f.name for f in c.fields], "properties": props},
     }
 
 
@@ -151,7 +173,7 @@ async def plan(whats_new: str, platforms: list[str]) -> tuple[list[Proposal], st
     """Draft a tailored post per platform. Executes nothing; returns proposals.
 
     The model may call each platform's post tool; we intercept the call, record
-    the drafted text, and answer with a synthetic 'queued' result so it moves on.
+    the drafted fields, and answer with a synthetic 'queued' result so it moves on.
     """
     if not credentials_available():
         raise MissingCredentials("the agent needs ANTHROPIC_API_KEY set")
@@ -185,11 +207,13 @@ async def plan(whats_new: str, platforms: list[str]) -> tuple[list[Proposal], st
         results = []
         for call in calls:
             platform = call.name.removeprefix("post_to_")
-            content = str((call.input or {}).get("content", "")).strip()
-            limit = CONNECTORS[platform].limit if platform in CONNECTORS else 100000
-            if platform in CONNECTORS and platform not in seen and content:
-                proposals.append(Proposal(platform, content[:limit], call.id))
-                seen.add(platform)
+            conn = CONNECTORS.get(platform)
+            if conn and platform not in seen:
+                data = call.input or {}
+                values = {f.name: str(data.get(f.name, "")).strip()[: f.limit] for f in conn.fields}
+                if any(values.values()):
+                    proposals.append(Proposal(platform, values, call.id))
+                    seen.add(platform)
             results.append({
                 "type": "tool_result",
                 "tool_use_id": call.id,
@@ -206,11 +230,11 @@ async def publish(proposals: list[Proposal]) -> list[Result]:
     for p in proposals:
         c = CONNECTORS[p.platform]
         try:
-            args = {**c.secrets(), c.draft_field: p.content}
+            args = {**c.secrets(), **p.values}
+            env = {**os.environ, **c.env()}
         except MissingCredentials as exc:
             results.append(Result(p.platform, False, str(exc)))
             continue
-        env = {**os.environ, **c.env()}
         try:
             async with connect(sys.executable, [c.server], env=env) as server:
                 out = await server.call(c.tool, args)
@@ -232,14 +256,14 @@ def _cli(argv: list[str] | None = None) -> int:
 
     ap = argparse.ArgumentParser(prog="presence", description="draft -> confirm -> publish")
     ap.add_argument("whats_new", help="what is new (the agent drafts from this)")
-    ap.add_argument("--to", required=True, help="comma-separated platforms, e.g. discord")
+    ap.add_argument("--to", required=True, help="comma-separated platforms, e.g. discord,slack")
     ap.add_argument("--yes", action="store_true", help="publish without the interactive gate")
     opts = ap.parse_args(argv)
     platforms = [p.strip() for p in opts.to.split(",") if p.strip()]
 
     try:
         proposals, notes = asyncio.run(plan(opts.whats_new, platforms))
-    except MissingCredentials as exc:
+    except (MissingCredentials, ValueError) as exc:
         print(f"  {exc}", file=sys.stderr)
         return 2
 
@@ -249,7 +273,10 @@ def _cli(argv: list[str] | None = None) -> int:
         print("  no drafts produced")
         return 1
     for p in proposals:
-        print(f"  --- {p.label} ---\n{p.content}\n")
+        print(f"  --- {p.label} ---")
+        for name, text in p.values.items():
+            print(f"  [{name}] {text}")
+        print()
 
     if not opts.yes:
         reply = input("  publish these? [y/N] ").strip().lower()

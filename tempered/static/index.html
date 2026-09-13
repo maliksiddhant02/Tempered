@@ -85,6 +85,8 @@ summary{cursor:pointer;font-size:12px;color:var(--dim)}
         <label>Anthropic API key<input type="password" id="k_anthropic" placeholder="sk-ant-…"></label>
         <label>Discord webhook URL<input type="password" id="k_discord" placeholder="https://discord.com/api/webhooks/…"></label>
         <label>Slack webhook URL<input type="password" id="k_slack" placeholder="https://hooks.slack.com/services/…"></label>
+        <label>GitHub token<input type="password" id="k_ghtoken" placeholder="ghp_…"></label>
+        <label>GitHub repo (owner/name)<input type="text" id="k_ghrepo" placeholder="octocat/hello-world"></label>
       </div>
       <div class="row" style="margin-top:10px">
         <button id="saveKeys" class="ghost">Save keys</button>
@@ -98,6 +100,7 @@ summary{cursor:pointer;font-size:12px;color:var(--dim)}
     <div class="row" style="margin-top:10px;align-items:center">
       <label class="check"><input type="checkbox" class="plat" value="discord" checked> Discord</label>
       <label class="check"><input type="checkbox" class="plat" value="slack" checked> Slack</label>
+      <label class="check"><input type="checkbox" class="plat" value="github"> GitHub</label>
       <button id="draft">Draft</button>
     </div>
     <div class="msg" id="draftMsg"></div>
@@ -305,7 +308,6 @@ $('gen').onclick = async () => {
 $('source').value = 'fixtures/broken_server.py';
 
 // --- Presence agent -------------------------------------------------------
-const LIMITS = {discord: 2000, slack: 3000};
 async function postJSON(url, body) {
   const r = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify(body)});
@@ -325,10 +327,12 @@ $('saveKeys').onclick = async () => {
     ANTHROPIC_API_KEY: $('k_anthropic').value.trim(),
     DISCORD_WEBHOOK_URL: $('k_discord').value.trim(),
     SLACK_WEBHOOK_URL: $('k_slack').value.trim(),
+    GITHUB_TOKEN: $('k_ghtoken').value.trim(),
+    GITHUB_REPO: $('k_ghrepo').value.trim(),
   };
   try {
     await postJSON('/api/presence/keys', body);
-    ['k_anthropic', 'k_discord', 'k_slack'].forEach(id => $(id).value = '');  // don't linger in the DOM
+    ['k_anthropic', 'k_discord', 'k_slack', 'k_ghtoken', 'k_ghrepo'].forEach(id => $(id).value = '');
     await loadKeys();
   } catch (e) { $('keyStatus').textContent = String(e.message || e); }
 };
@@ -347,13 +351,21 @@ $('draft').onclick = async () => {
     d.proposals.forEach(p => {
       const el = document.createElement('div');
       el.className = 'draft'; el.dataset.platform = p.platform;
-      el.innerHTML = `<div class="head"><span class="plat-name">${esc(p.label)}</span><span class="count"></span></div>
-        <textarea rows="5"></textarea>`;
-      const ta = el.querySelector('textarea'), c = el.querySelector('.count');
-      ta.value = p.content;                                  // set as value, never parsed as HTML
-      const upd = () => { const n = ta.value.length, lim = LIMITS[p.platform] || 99999;
-        c.textContent = `${n}/${lim}`; c.classList.toggle('over', n > lim); };
-      ta.addEventListener('input', upd); upd();
+      el.innerHTML = `<div class="head"><span class="plat-name">${esc(p.label)}</span></div>`;
+      p.fields.forEach(f => {
+        const wrap = document.createElement('div');
+        wrap.style.marginTop = '8px';
+        wrap.innerHTML = `<div class="count" style="display:flex;justify-content:space-between">
+            <span>${esc(f.label)}</span><span class="cnt"></span></div>
+          <textarea rows="${f.name === 'title' ? 2 : 5}"></textarea>`;
+        const ta = wrap.querySelector('textarea'), c = wrap.querySelector('.cnt');
+        ta.dataset.field = f.name;
+        ta.value = f.value;                                  // set as value, never parsed as HTML
+        const upd = () => { const n = ta.value.length;
+          c.textContent = `${n}/${f.limit}`; c.classList.toggle('over', n > f.limit); };
+        ta.addEventListener('input', upd); upd();
+        el.appendChild(wrap);
+      });
       $('drafts').appendChild(el);
     });
     $('publishRow').classList.remove('hide');
@@ -361,8 +373,10 @@ $('draft').onclick = async () => {
   finally { $('draft').disabled = false; }
 };
 $('publish').onclick = async () => {
-  const items = [...document.querySelectorAll('.draft')].map(el =>
-    ({platform: el.dataset.platform, content: el.querySelector('textarea').value}));
+  const items = [...document.querySelectorAll('.draft')].map(el => ({
+    platform: el.dataset.platform,
+    values: Object.fromEntries([...el.querySelectorAll('textarea')].map(ta => [ta.dataset.field, ta.value])),
+  }));
   $('publish').disabled = true;
   $('pubResults').innerHTML = '<div class="msg">publishing…</div>';
   try {
