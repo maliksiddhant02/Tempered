@@ -39,6 +39,9 @@ def main(argv: list[str] | None = None) -> int:
     fix.add_argument("--name", help="label for the report")
     fix.add_argument("--show-diff", action="store_true", help="print the patch for each attempt")
 
+    web = sub.add_parser("serve", help="local web UI")
+    web.add_argument("--port", type=int, default=8000)
+
     gen = sub.add_parser("generate", help="build an MCP server from an OpenAPI spec")
     gen.add_argument("spec", help="path or URL to an OpenAPI document")
     gen.add_argument("--out", required=True, metavar="DIR", help="where to write the server")
@@ -50,6 +53,11 @@ def main(argv: list[str] | None = None) -> int:
         return _test(opts)
     if opts.command == "repair":
         return _repair(opts)
+    if opts.command == "serve":
+        from .web import serve
+
+        serve(opts.port)
+        return 0
     return _generate(opts)
 
 

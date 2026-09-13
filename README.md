@@ -31,6 +31,22 @@ what Tempered calls **silent success**, and it is invisible to every existing to
 python -m venv .venv && .venv/Scripts/pip install mcp fastmcp anthropic
 ```
 
+### Web UI
+
+```bash
+python -m tempered.cli serve
+```
+
+Open <http://127.0.0.1:8000>. Paste a spec URL to generate a server, then scan it
+and watch findings stream in live as each adversarial payload lands. The repair
+button runs the patch loop and renders the diff of every attempt.
+
+Binds to localhost only, and deliberately: scanning a server means spawning the
+process that runs it, so this endpoint executes commands. Local dev tool, not
+something to expose.
+
+### CLI
+
 Scan a server you already have:
 
 ```bash
@@ -145,7 +161,9 @@ tempered/
   repair.py     bounded patch loop, full re-verify
   generate.py   OpenAPI -> server, + method manifest
   report.py     terminal / HTML / JSON
-  cli.py        test | repair | generate
+  web.py        local UI, SSE-streamed scans
+  static/       the one page it serves
+  cli.py        test | repair | generate | serve
 fixtures/
   schema.py         the contract both fixtures declare
   good_server.py    enforces it  -> must score A
@@ -155,8 +173,9 @@ test_tempered.py    end-to-end self-check
 
 ## Status
 
-Built at a hackathon. `test`, `generate`, and the scan engine are verified
-end-to-end against both fixtures and a live third-party API. The `repair` loop's
+Built at a hackathon. `test`, `generate`, `serve`, and the scan engine are
+verified end-to-end against both fixtures and a live third-party API, through the
+CLI and through the browser. The `repair` loop's
 model call is **not yet live-tested** — it was written against the current
 Anthropic SDK but no API key was available in the build environment.
 

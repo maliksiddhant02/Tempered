@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tempered</title>
+<style>
+:root{color-scheme:light dark;--bg:#fbfaf9;--fg:#1a1a1a;--dim:#6b6b6b;--line:#e4e1dd;
+  --card:#fff;--pass:#2f7d4f;--fail:#c0392b;--amb:#9a7b28;--accent:#1a1a1a;--rail:#f2f0ee}
+@media(prefers-color-scheme:dark){:root{--bg:#16161a;--fg:#e8e6e3;--dim:#9a9a9a;--line:#2c2c33;
+  --card:#1d1d22;--pass:#57b87f;--fail:#e57366;--amb:#d4ac52;--accent:#e8e6e3;--rail:#202027}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);
+  font:15px/1.55 ui-sans-serif,system-ui,-apple-system,sans-serif}
+main{max-width:1020px;margin:0 auto;padding:40px 24px 80px}
+h1{font-size:26px;margin:0;letter-spacing:-.02em}
+.tag{color:var(--dim);font-size:13px;margin:4px 0 28px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px 20px;margin-bottom:18px}
+.panel h2{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);margin:0 0 12px;font-weight:600}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+input[type=text]{flex:1;min-width:260px;padding:9px 12px;border:1px solid var(--line);border-radius:7px;
+  background:var(--bg);color:var(--fg);font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
+input[type=text]:focus{outline:2px solid var(--accent);outline-offset:-1px}
+button{padding:9px 16px;border:1px solid var(--accent);border-radius:7px;background:var(--accent);
+  color:var(--bg);font-size:13px;font-weight:600;cursor:pointer}
+button.ghost{background:transparent;color:var(--fg);border-color:var(--line)}
+button:disabled{opacity:.4;cursor:not-allowed}
+label.check{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--dim)}
+.hero{display:none;align-items:center;gap:20px;margin-bottom:18px}
+.hero.on{display:flex}
+.grade{font-size:52px;font-weight:600;line-height:1;min-width:64px;text-align:center}
+.grade.A,.grade.B{color:var(--pass)}.grade.C{color:var(--amb)}
+.grade.D,.grade.F{color:var(--fail)}.grade\?{color:var(--dim)}
+.stats{font-size:13px;color:var(--dim)}.stats b{color:var(--fg)}
+.progress{height:4px;background:var(--rail);border-radius:2px;overflow:hidden;margin-top:10px}
+.progress span{display:block;height:100%;width:0;background:var(--pass);transition:width .2s}
+.tool{border-top:1px solid var(--line);padding:12px 0}
+.tool:first-child{border-top:0}
+.tool h3{margin:0;font:13px ui-monospace,SFMono-Regular,Menlo,monospace;display:flex;gap:10px;align-items:center}
+.pill{font-size:10px;letter-spacing:.05em;font-weight:700;padding:2px 7px;border-radius:99px;text-transform:uppercase}
+.pill.pass{background:color-mix(in srgb,var(--pass) 16%,transparent);color:var(--pass)}
+.pill.fail{background:color-mix(in srgb,var(--fail) 16%,transparent);color:var(--fail)}
+.pill.skip,.pill.inc{background:color-mix(in srgb,var(--amb) 16%,transparent);color:var(--amb)}
+.note{font-size:12px;color:var(--dim);margin-top:5px}
+.find{display:grid;grid-template-columns:120px 1fr;gap:8px;font-size:12px;padding:6px 0 6px 10px;
+  border-left:2px solid transparent;margin-top:6px}
+.find.silent_success,.find.crash{border-left-color:var(--fail);background:color-mix(in srgb,var(--fail) 5%,transparent)}
+.find.ambiguous{border-left-color:var(--amb)}
+.v{font-weight:700;font-size:10px;letter-spacing:.05em}
+.v.silent_success,.v.crash{color:var(--fail)}.v.ambiguous{color:var(--amb)}.v.pass{color:var(--pass)}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;word-break:break-all}
+.io{color:var(--dim);margin-top:3px}
+.io b{color:var(--fg);font-weight:600}
+pre.diff{background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:12px;
+  overflow-x:auto;font-size:11.5px;line-height:1.45;margin:10px 0 0}
+pre.diff .add{color:var(--pass)}pre.diff .del{color:var(--fail)}
+.msg{font-size:13px;color:var(--dim);padding:6px 0}
+.msg.err{color:var(--fail)}
+.hide{display:none}
+</style>
+</head>
+<body>
+<main>
+  <h1>Tempered</h1>
+  <p class="tag">Generate an MCP server, prove it works, repair what fails.</p>
+
+  <div class="panel">
+    <h2>1 &nbsp;Generate from an OpenAPI spec</h2>
+    <div class="row">
+      <input type="text" id="spec" placeholder="https://petstore3.swagger.io/api/v3/openapi.json">
+      <button id="gen">Generate</button>
+    </div>
+    <div class="msg" id="genMsg"></div>
+  </div>
+
+  <div class="panel">
+    <h2>2 &nbsp;Scan for conformance</h2>
+    <div class="row">
+      <input type="text" id="source" placeholder="fixtures/broken_server.py">
+      <button id="scan">Scan</button>
+      <button id="repair" class="ghost">Repair</button>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <label class="check"><input type="checkbox" id="writes"> also scan write tools (POST/PUT/DELETE)</label>
+    </div>
+    <div class="msg" id="scanMsg"></div>
+  </div>
+
+  <div class="hero panel" id="hero">
+    <div class="grade" id="grade">·</div>
+    <div style="flex:1">
+      <div class="stats" id="stats"></div>
+      <div class="progress"><span id="bar"></span></div>
+    </div>
+  </div>
+
+  <div class="panel hide" id="results"></div>
+  <div class="panel hide" id="repairOut"><h2>Repair</h2><div id="repairBody"></div></div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+let stream = null, tools = {}, seen = 0, expected = 0;
+
+function reset() {
+  if (stream) { stream.close(); stream = null; }
+  tools = {}; seen = 0; expected = 0;
+  $('results').innerHTML = ''; $('results').classList.add('hide');
+  $('repairOut').classList.add('hide'); $('repairBody').innerHTML = '';
+  $('hero').classList.remove('on'); $('bar').style.width = '0';
+  $('scanMsg').textContent = ''; $('scanMsg').className = 'msg';
+}
+
+function toolBlock(name) {
+  if (tools[name]) return tools[name];
+  const el = document.createElement('div');
+  el.className = 'tool';
+  el.innerHTML = `<h3>${esc(name)} <span class="pill pass" data-pill>running</span></h3><div data-body></div>`;
+  $('results').appendChild(el);
+  $('results').classList.remove('hide');
+  tools[name] = el;
+  return el;
+}
+
+function onEvent(ev) {
+  const d = JSON.parse(ev.data);
+  if (d.type === 'start') {
+    $('hero').classList.add('on');
+    $('grade').textContent = '·'; $('grade').className = 'grade';
+    $('stats').innerHTML = `scanning <b>${d.tools.length}</b> tools…`;
+  }
+  else if (d.type === 'tool_start') { expected += d.checks; toolBlock(d.tool); }
+  else if (d.type === 'tool_skipped') {
+    const el = toolBlock(d.tool);
+    el.querySelector('[data-pill]').className = 'pill skip';
+    el.querySelector('[data-pill]').textContent = 'skipped';
+    el.querySelector('[data-body]').innerHTML = `<div class="note">${esc(d.reason)}</div>`;
+  }
+  else if (d.type === 'tool_inconclusive') {
+    const el = toolBlock(d.tool);
+    el.querySelector('[data-pill]').className = 'pill inc';
+    el.querySelector('[data-pill]').textContent = 'inconclusive';
+    el.querySelector('[data-body]').innerHTML = `<div class="note">${esc(d.note)}</div>`;
+  }
+  else if (d.type === 'finding') {
+    seen++;
+    if (expected) $('bar').style.width = Math.min(100, seen / expected * 100) + '%';
+    if (d.verdict === 'pass') return;              // only failures earn a row
+    const body = toolBlock(d.tool).querySelector('[data-body]');
+    const row = document.createElement('div');
+    row.className = 'find ' + d.verdict;
+    row.innerHTML =
+      `<div class="v ${d.verdict}">${esc(d.verdict.replace('_', ' ').toUpperCase())}</div>
+       <div><code>${esc(d.field)}</code> — ${esc(d.detail)}
+         <div class="io"><b>sent</b> <code>${esc(JSON.stringify(d.payload))}</code></div>
+         <div class="io"><b>got</b> <code>${esc(String(d.response).slice(0, 160))}</code></div>
+       </div>`;
+    body.appendChild(row);
+  }
+  else if (d.type === 'tool_done') {
+    const el = tools[d.tool]; if (!el) return;
+    const pill = el.querySelector('[data-pill]');
+    const failed = el.querySelectorAll('.find.silent_success, .find.crash').length;
+    pill.className = 'pill ' + (failed ? 'fail' : 'pass');
+    pill.textContent = failed ? `${failed} failing` : 'clean';
+  }
+  else if (d.type === 'done') {
+    $('grade').textContent = d.grade;
+    $('grade').className = 'grade ' + d.grade;
+    $('bar').style.width = '100%';
+    $('stats').innerHTML =
+      `<b>${Math.round(d.pass_rate * 100)}%</b> pass rate · <b>${d.total_checks}</b> adversarial checks · ` +
+      (d.failures ? `<b>${d.failures}</b> failing` : 'no failures') +
+      (d.inconclusive ? ` · ${d.inconclusive} inconclusive` : '') +
+      (d.skipped ? ` · ${d.skipped} skipped` : '');
+    finish();
+  }
+  else if (d.type === 'repair_start') {
+    $('repairOut').classList.remove('hide');
+    $('repairBody').innerHTML = '<div class="msg">scanning, then patching…</div>';
+  }
+  else if (d.type === 'attempt') {
+    const diff = esc(d.diff).split('\n').map(l =>
+      l.startsWith('+') ? `<span class="add">${l}</span>` :
+      l.startsWith('-') ? `<span class="del">${l}</span>` : l).join('\n');
+    $('repairBody').insertAdjacentHTML('beforeend',
+      `<div class="tool"><h3>attempt ${d.number}
+         <span class="pill ${d.kept ? 'pass' : 'skip'}">${d.kept ? 'kept' : 'rejected'}</span>
+         <span class="note">→ ${esc(d.grade)} ${Math.round(d.pass_rate * 100)}%</span></h3>
+         <pre class="diff">${diff}</pre></div>`);
+  }
+  else if (d.type === 'repair_done') {
+    $('repairBody').insertAdjacentHTML('beforeend',
+      `<div class="msg"><b>${esc(d.before.grade)} ${Math.round(d.before.pass_rate * 100)}%</b>
+       → <b>${esc(d.after.grade)} ${Math.round(d.after.pass_rate * 100)}%</b>
+       ${d.fixed ? '· all checks passing' : '· some checks still failing, left failed'}</div>`);
+    finish();
+  }
+  else if (d.type === 'error') { fail(d.message); }
+}
+
+function finish() {
+  if (stream) { stream.close(); stream = null; }
+  $('scan').disabled = false; $('repair').disabled = false; $('gen').disabled = false;
+}
+function fail(message) {
+  $('scanMsg').textContent = message;
+  $('scanMsg').className = 'msg err';
+  finish();
+}
+
+function open(url) {
+  $('scan').disabled = true; $('repair').disabled = true; $('gen').disabled = true;
+  stream = new EventSource(url);
+  stream.onmessage = onEvent;
+  stream.onerror = () => { if (stream) fail('connection to the scanner dropped'); };
+}
+
+$('scan').onclick = () => {
+  const source = $('source').value.trim();
+  if (!source) return fail('give me a path to a server');
+  reset();
+  open(`/api/scan?source=${encodeURIComponent(source)}&allow_writes=${$('writes').checked ? 1 : 0}`);
+};
+
+$('repair').onclick = () => {
+  const source = $('source').value.trim();
+  if (!source) return fail('give me a path to a server');
+  reset();
+  open(`/api/repair?source=${encodeURIComponent(source)}`);
+};
+
+$('gen').onclick = async () => {
+  const spec = $('spec').value.trim();
+  if (!spec) return;
+  $('gen').disabled = true;
+  $('genMsg').className = 'msg';
+  $('genMsg').textContent = 'fetching spec and generating…';
+  try {
+    const r = await fetch('/api/generate', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({spec})
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'generate failed');
+    $('genMsg').textContent = `wrote ${d.server} — ${d.tools} tools (${d.writes} write tools, skipped unless you opt in)`;
+    $('source').value = d.server.replace(/\\/g, '/');
+  } catch (e) {
+    $('genMsg').className = 'msg err';
+    $('genMsg').textContent = String(e.message || e);
+  } finally {
+    $('gen').disabled = false;
+  }
+};
+
+$('source').value = 'fixtures/broken_server.py';
+</script>
+</body>
+</html>

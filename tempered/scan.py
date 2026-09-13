@@ -8,7 +8,11 @@ with nothing raised anywhere.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Callable
+
+# Called with a dict as each tool and finding lands, so a UI can render the scan
+# while it runs instead of after it. None means nobody is watching.
+Listener = Callable[[dict[str, Any]], None] | None
 
 from . import client, synth
 
@@ -143,14 +147,20 @@ def meets(grade: str, minimum: str) -> bool:
     return order.index(grade) <= order.index(minimum)
 
 
-async def scan_tool(server: client.Server, tool: client.ToolInfo) -> ToolReport:
+async def scan_tool(
+    server: client.Server, tool: client.ToolInfo, on_event: Listener = None
+) -> ToolReport:
     """Every single-constraint violation of one tool's schema, called for real."""
+    emit = on_event or (lambda event: None)
     report = ToolReport(
         name=tool.name, description=tool.description, baseline_ok=True, baseline_note=""
     )
 
     # Sanity first: if the server rejects its own valid example, every result
     # below is meaningless.
+    violations = synth.synthesize(tool.input_schema)
+    emit({"type": "tool_start", "tool": tool.name, "checks": len(violations)})
+
     baseline = synth.example(tool.input_schema)
     if isinstance(baseline, dict):
         outcome = await server.call(tool.name, baseline)
@@ -158,9 +168,10 @@ async def scan_tool(server: client.Server, tool: client.ToolInfo) -> ToolReport:
             report.baseline_ok = False
             report.baseline_note = f"valid input was not accepted: {outcome.text}"
             # Nothing below this point can be trusted, so do not spend the calls.
+            emit({"type": "tool_inconclusive", "tool": tool.name, "note": report.baseline_note})
             return report
 
-    for violation in synth.synthesize(tool.input_schema):
+    for violation in violations:
         outcome = await server.call(tool.name, violation.payload)
         if outcome.kind == client.CRASH:
             verdict = CRASH
@@ -171,17 +182,28 @@ async def scan_tool(server: client.Server, tool: client.ToolInfo) -> ToolReport:
         else:
             verdict = SILENT_SUCCESS
 
-        report.findings.append(
-            Finding(
-                tool=tool.name,
-                field_path=violation.field,
-                constraint=violation.constraint,
-                detail=violation.detail,
-                payload=violation.payload,
-                verdict=verdict,
-                response=outcome.text,
-            )
+        finding = Finding(
+            tool=tool.name,
+            field_path=violation.field,
+            constraint=violation.constraint,
+            detail=violation.detail,
+            payload=violation.payload,
+            verdict=verdict,
+            response=outcome.text,
         )
+        report.findings.append(finding)
+        emit({
+            "type": "finding",
+            "tool": finding.tool,
+            "field": finding.field_path,
+            "constraint": finding.constraint,
+            "detail": finding.detail,
+            "verdict": finding.verdict,
+            "payload": finding.payload,
+            "response": finding.response,
+        })
+
+    emit({"type": "tool_done", "tool": tool.name, "pass_rate": report.pass_rate})
     return report
 
 
@@ -191,6 +213,7 @@ async def scan(
     label: str,
     methods: dict[str, str] | None = None,
     allow_writes: bool = False,
+    on_event: Listener = None,
 ) -> Report:
     """Spawn a server and scan every tool it exposes.
 
@@ -201,22 +224,38 @@ async def scan(
     """
     from .generate import READ_ONLY_METHODS
 
+    emit = on_event or (lambda event: None)
     methods = methods or {}
     report = Report(server=label)
 
     async with client.connect(command, args) as server:
-        for tool in await server.tools():
+        tools = await server.tools()
+        emit({"type": "start", "server": label, "tools": [t.name for t in tools]})
+
+        for tool in tools:
             method = methods.get(tool.name, "")
             if method and method not in READ_ONLY_METHODS and not allow_writes:
+                reason = f"{method.upper()} tool - not called (pass --allow-writes)"
+                emit({"type": "tool_skipped", "tool": tool.name, "reason": reason})
                 report.tools.append(
                     ToolReport(
                         name=tool.name,
                         description=tool.description,
                         baseline_ok=True,
                         baseline_note="",
-                        skipped=f"{method.upper()} tool - not called (pass --allow-writes)",
+                        skipped=reason,
                     )
                 )
                 continue
-            report.tools.append(await scan_tool(server, tool))
+            report.tools.append(await scan_tool(server, tool, on_event))
+
+    emit({
+        "type": "done",
+        "grade": report.grade,
+        "pass_rate": report.pass_rate,
+        "total_checks": report.total_checks,
+        "failures": len(report.failures),
+        "inconclusive": len(report.inconclusive),
+        "skipped": len(report.skipped),
+    })
     return report
