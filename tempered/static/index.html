@@ -120,6 +120,12 @@ summary{cursor:pointer;font-size:12px;color:var(--dim)}
       <button class="ghost prove" data-platform="github">Prove GitHub</button>
       <button class="ghost prove" data-platform="notion">Prove Notion</button>
     </div>
+    <div class="row" style="margin-top:8px;align-items:center">
+      <span class="note">Scored F? Harden it — Tempered rewrites it to enforce its schema, then re-proves:</span>
+      <button class="ghost harden" data-platform="discord">Harden Discord</button>
+      <button class="ghost harden" data-platform="slack">Harden Slack</button>
+      <button class="ghost harden" data-platform="github">Harden GitHub</button>
+    </div>
   </div>
 
   <p class="tag" style="margin:34px 0 14px;border-top:1px solid var(--line);padding-top:24px">
@@ -404,6 +410,10 @@ document.querySelectorAll('.prove').forEach(b => b.onclick = () => {
   reset();
   open('/api/presence/prove?platform=' + encodeURIComponent(b.dataset.platform));
   $('results').scrollIntoView({behavior: 'smooth', block: 'nearest'});
+});
+document.querySelectorAll('.harden').forEach(b => b.onclick = () => {
+  reset();
+  open('/api/presence/repair?platform=' + encodeURIComponent(b.dataset.platform));
 });
 loadKeys();
 </script>

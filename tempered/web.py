@@ -259,6 +259,49 @@ async def api_presence_prove(request: Request) -> Any:
     return EventSourceResponse(_pump(run))
 
 
+async def api_presence_repair(request: Request) -> Any:
+    """SSE: harden a connector — the repair loop, pointed at the safe sink.
+
+    Rewrites the connector in place to enforce its declared schema. The scans
+    inside fire at the sink (allow_writes is safe for that reason), so nothing
+    reaches the real API. This is the 'generate -> prove -> harden' close.
+    """
+    from presence.agent import CONNECTORS
+
+    from .generate import load_methods
+    from .repair import credentials_available, repair
+
+    platform = request.query_params.get("platform", "").strip()
+    connector = CONNECTORS.get(platform)
+    if not connector:
+        return JSONResponse({"error": f"no connector for {platform!r}"}, status_code=400)
+
+    if not credentials_available():
+        async def refuse(emit: Any) -> None:
+            emit({"type": "error", "message": "repair needs ANTHROPIC_API_KEY set before you start the server"})
+        return EventSourceResponse(_pump(refuse))
+
+    server_path = Path(connector.server)
+    methods = load_methods(server_path)
+    env = {**os.environ, "API_BASE_URL": _sink()}
+
+    async def run(emit: Any) -> None:
+        emit({"type": "repair_start", "source": str(server_path)})
+        result = await repair(server_path, sys.executable, [str(server_path)],
+                              f"{connector.label} connector", verbose=False,
+                              allow_writes=True, methods=methods, env=env)
+        for attempt in result.attempts:
+            emit({"type": "attempt", "number": attempt.number, "kept": attempt.kept,
+                  "diff": attempt.diff, "grade": attempt.report.grade,
+                  "pass_rate": attempt.report.pass_rate})
+        emit({"type": "repair_done",
+              "before": {"grade": result.before.grade, "pass_rate": result.before.pass_rate},
+              "after": {"grade": result.after.grade, "pass_rate": result.after.pass_rate},
+              "fixed": result.fixed})
+
+    return EventSourceResponse(_pump(run))
+
+
 async def api_presence_publish(request: Request) -> JSONResponse:
     """Publish only the (possibly edited) proposals the user approved."""
     from presence.agent import Proposal, publish
@@ -286,6 +329,7 @@ app = Starlette(routes=[
     Route("/api/presence/plan", api_presence_plan, methods=["POST"]),
     Route("/api/presence/publish", api_presence_publish, methods=["POST"]),
     Route("/api/presence/prove", api_presence_prove),
+    Route("/api/presence/repair", api_presence_repair),
 ])
 
 

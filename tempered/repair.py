@@ -45,6 +45,19 @@ Rules:
   numeric bounds, string lengths, and formats.
 - Remember that bool is a subclass of int in Python.
 
+If the server is a generated connector built with `FastMCP.from_openapi` (no
+explicit handler), it forwards everything without validation — that is the bug.
+Replace it with explicit tools: for each operation in the spec, define a tool
+(keep the operationId as its name) that first validates its arguments against
+that operation's declared JSON Schema — path params and request-body properties
+alike — raising ValueError on any violation, and only then performs the SAME
+HTTP request the connector made (same method and path, same BASE_URL, same
+headers/token from the environment). Keep imports exactly as they are (note it
+is `httpx2`, not `httpx`), keep BASE_URL/API_TOKEN/API_HEADERS handling, and keep
+valid calls behaving exactly as before. The file must run as-is. Do NOT use
+*args or **kwargs in any tool function — FastMCP rejects them; declare every
+parameter explicitly.
+
 Return the COMPLETE corrected file in a single ```python code block. No commentary."""
 
 
@@ -114,16 +127,27 @@ def _patch(source: str, report: Report) -> str | None:
 
 
 async def repair(
-    source_path: Path, command: str, args: list[str], label: str, verbose: bool = True
+    source_path: Path, command: str, args: list[str], label: str, verbose: bool = True,
+    allow_writes: bool = False, methods: dict[str, str] | None = None,
+    env: dict[str, str] | None = None,
 ) -> RepairResult:
-    """Scan, patch, re-verify. At most MAX_ATTEMPTS patches, best result kept."""
+    """Scan, patch, re-verify. At most MAX_ATTEMPTS patches, best result kept.
+
+    `allow_writes`/`methods`/`env` are forwarded to every scan — repairing a
+    connector must point it at a safe sink (via env) so the adversarial writes
+    the re-scan fires never reach the real API.
+    """
     if not credentials_available():
         raise MissingCredentials(
             "repair needs ANTHROPIC_API_KEY (or an `ant auth login` profile)"
         )
 
+    async def rescan() -> Report:
+        return await scan(command, args, label, methods=methods,
+                          allow_writes=allow_writes, env=env)
+
     original = source_path.read_text(encoding="utf-8")
-    before = await scan(command, args, label)
+    before = await rescan()
     best, best_source = before, original
     attempts: list[Attempt] = []
 
@@ -140,10 +164,6 @@ async def repair(
             break
 
         source_path.write_text(candidate, encoding="utf-8")
-        # The whole suite, not just what failed: a fix that loosens another
-        # constraint has to show up here.
-        after = await scan(command, args, label)
-
         diff = "".join(
             difflib.unified_diff(
                 best_source.splitlines(keepends=True),
@@ -152,6 +172,19 @@ async def repair(
                 tofile=f"{source_path.name} (attempt {number})",
             )
         )
+        # The whole suite, not just what failed: a fix that loosens another
+        # constraint has to show up here. If the candidate will not even run or
+        # scan (e.g. the model emitted code FastMCP rejects), discard it and
+        # restore the best — never leave a broken file behind.
+        try:
+            after = await rescan()
+        except Exception as exc:  # noqa: BLE001
+            source_path.write_text(best_source, encoding="utf-8")
+            attempts.append(Attempt(number, diff, best, kept=False))
+            if verbose:
+                print(f"  -> candidate did not run ({type(exc).__name__}); discarded")
+            continue
+
         kept = after.pass_rate > best.pass_rate
         attempts.append(Attempt(number, diff, after, kept))
 
