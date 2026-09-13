@@ -28,7 +28,13 @@ STATIC = Path(__file__).parent / "static"
 
 # Keys the chat + generated servers use. Held in this process's environment only;
 # never written to disk, never returned to the browser.
-CHAT_KEYS = ("ANTHROPIC_API_KEY", "API_TOKEN")
+CHAT_KEYS = (
+    "ANTHROPIC_API_KEY",       # chat, describe, repair
+    "SLACK_WEBHOOK_URL",       # generated Slack tools
+    "GITHUB_TOKEN",            # generated GitHub tools
+    "OPENAI_API_KEY",          # generated OpenAI tools
+    "API_TOKEN",               # generic bearer for OpenAPI-derived servers
+)
 
 CHAT_MODEL = "claude-sonnet-4-6"
 CHAT_MAX_TURNS = 12  # ponytail: hard cap, bump if a real task needs longer chains
@@ -67,8 +73,32 @@ def _dumps(payload: dict[str, Any]) -> str:
     return json.dumps(payload, default=str)
 
 
+def _load_dotenv() -> None:
+    """Populate os.environ from ./.env if present. Stdlib only.
+
+    Real environment always wins — .env is a fallback for keys the user did
+    not export from their shell. Handles quoted values and inline comments.
+    """
+    path = Path(".env")
+    if not path.exists():
+        return
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key and not os.environ.get(key):
+            os.environ[key] = value
+
+
 async def index(request: Request) -> FileResponse:
     return FileResponse(STATIC / "index.html")
+
+
+async def demo(request: Request) -> FileResponse:
+    return FileResponse(STATIC / "demo.html")
 
 
 async def api_scan(request: Request) -> EventSourceResponse:
@@ -248,6 +278,110 @@ async def api_chat(request: Request) -> Any:
     return EventSourceResponse(_pump(run))
 
 
+# --- Describe -> generate MCP server from English -----------------------------
+
+DESCRIBE_MODEL = "claude-opus-4-7"
+
+DESCRIBE_SYSTEM = """You write Python MCP servers using the FastMCP library.
+
+Given the user's description of an app, output a COMPLETE, RUNNABLE Python file.
+
+Required shape:
+
+    import os
+    import httpx
+    from fastmcp import FastMCP
+
+    mcp = FastMCP("some-descriptive-name")
+
+    @mcp.tool()
+    async def tool_name(arg: str, another: int = 10) -> str:
+        \"\"\"One-line description of what this tool does. This is what the calling
+        model sees when deciding which tool to use.\"\"\"
+        # Validate. Raise ValueError with a clear message when input violates any
+        # constraint you documented (enum, range, format). No silent success.
+        if not arg:
+            raise ValueError("arg must not be empty")
+        # Call the real API.
+        token = os.environ.get("SOME_ENV_VAR")
+        if not token:
+            raise RuntimeError("SOME_ENV_VAR is not set")
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            r = await client.post("https://api.example.com/...", json={...},
+                                  headers={"Authorization": f"Bearer {token}"})
+            r.raise_for_status()
+            return r.text
+
+    if __name__ == "__main__":
+        mcp.run()
+
+Rules:
+- Use real API endpoints you actually know. If the user names an API you don't
+  know well, prefer fewer tools that are correct over many that are guessed.
+- Read every secret from os.environ. Common ones already available:
+  SLACK_WEBHOOK_URL, GITHUB_TOKEN, OPENAI_API_KEY. Use those names when they fit.
+- Each tool: typed parameters, one-line docstring, input validation with clear
+  ValueError messages, real HTTP call, meaningful return string.
+- Do NOT invent endpoints or auth flows. If unsure, skip the tool.
+- 1 to 6 tools per server. Keep tools focused; the calling model picks by name.
+
+Return ONLY the Python file inside a single ```python code block. No commentary."""
+
+
+def _extract_python(text: str) -> str | None:
+    import re
+    blocks = re.findall(r"```(?:python)?\n(.*?)```", text, re.DOTALL)
+    return blocks[-1].strip() + "\n" if blocks else None
+
+
+def _slug(text: str, limit: int = 32) -> str:
+    import hashlib
+    import re
+    slug = re.sub(r"[^a-z0-9]+", "_", text.lower()).strip("_")[:limit] or "app"
+    tag = hashlib.sha1(text.encode()).hexdigest()[:6]
+    return f"{slug}_{tag}"
+
+
+def _describe_sync(description: str) -> str:
+    """One Claude call. Returns generated Python source, or raises."""
+    import anthropic
+    api = anthropic.Anthropic()
+    resp = api.messages.create(
+        model=DESCRIBE_MODEL,
+        max_tokens=8000,
+        system=DESCRIBE_SYSTEM,
+        messages=[{"role": "user", "content": description}],
+    )
+    text = "".join(b.text for b in resp.content if b.type == "text")
+    code = _extract_python(text)
+    if not code:
+        raise RuntimeError("model returned no code block")
+    return code
+
+
+async def api_describe(request: Request) -> JSONResponse:
+    body = await request.json()
+    description = (body.get("description") or "").strip()
+    if not description:
+        return JSONResponse({"error": "description is required"}, status_code=400)
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        return JSONResponse({"error": "ANTHROPIC_API_KEY not set — add it in Keys"}, status_code=400)
+
+    try:
+        code = await asyncio.to_thread(_describe_sync, description)
+    except Exception as exc:  # noqa: BLE001 - surface reason to UI
+        return JSONResponse({"error": f"{type(exc).__name__}: {exc}"}, status_code=400)
+
+    out_dir = Path("generated")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    path = out_dir / f"{_slug(description)}.py"
+    path.write_text(code, encoding="utf-8")
+
+    # Count @mcp.tool occurrences as a rough tool count for the UI.
+    tool_count = code.count("@mcp.tool")
+    return JSONResponse({"server": str(path), "tools": tool_count, "description": description})
+
+
 # --- Presets ------------------------------------------------------------------
 
 # Curated apps with public OpenAPI specs. Only ones verified to actually load
@@ -268,11 +402,13 @@ async def api_presets(request: Request) -> JSONResponse:
 
 app = Starlette(routes=[
     Route("/", index),
+    Route("/demo", demo),
     Route("/api/scan", api_scan),
     Route("/api/generate", api_generate, methods=["POST"]),
     Route("/api/repair", api_repair),
     Route("/api/keys", api_keys, methods=["GET", "POST"]),
     Route("/api/chat", api_chat, methods=["POST"]),
+    Route("/api/describe", api_describe, methods=["POST"]),
     Route("/api/presets", api_presets),
 ])
 
@@ -280,5 +416,9 @@ app = Starlette(routes=[
 def serve(port: int = 8000) -> None:
     import uvicorn
 
+    _load_dotenv()
+    loaded = [k for k in CHAT_KEYS if os.environ.get(k)]
     print(f"  tempered ui  ->  http://127.0.0.1:{port}")
+    if loaded:
+        print(f"  keys from env: {', '.join(loaded)}")
     uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning")

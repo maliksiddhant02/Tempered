@@ -3,435 +3,184 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Tempered</title>
+<title>Tempered — build any AI tool from a sentence</title>
 <style>
 :root{color-scheme:light dark;--bg:#fbfaf9;--fg:#1a1a1a;--dim:#6b6b6b;--line:#e4e1dd;
   --card:#fff;--pass:#2f7d4f;--fail:#c0392b;--amb:#9a7b28;--accent:#1a1a1a;--rail:#f2f0ee;
-  --user:#eef3ef;--assistant:#fff;--tool:#f5efe1}
+  --hero-glow:radial-gradient(circle at 50% 0%,color-mix(in srgb,var(--pass) 12%,transparent),transparent 60%)}
 @media(prefers-color-scheme:dark){:root{--bg:#16161a;--fg:#e8e6e3;--dim:#9a9a9a;--line:#2c2c33;
-  --card:#1d1d22;--pass:#57b87f;--fail:#e57366;--amb:#d4ac52;--accent:#e8e6e3;--rail:#202027;
-  --user:#1e2a24;--assistant:#1d1d22;--tool:#2a241a}}
+  --card:#1d1d22;--pass:#57b87f;--fail:#e57366;--amb:#d4ac52;--accent:#e8e6e3;--rail:#202027}}
 *{box-sizing:border-box}
+html{scroll-behavior:smooth}
 body{margin:0;background:var(--bg);color:var(--fg);
-  font:15px/1.55 ui-sans-serif,system-ui,-apple-system,sans-serif}
-main{max-width:1020px;margin:0 auto;padding:40px 24px 80px}
-h1{font-size:26px;margin:0;letter-spacing:-.02em}
-.tag{color:var(--dim);font-size:13px;margin:4px 0 28px}
-.panel{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px 20px;margin-bottom:18px}
-.panel h2{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);margin:0 0 12px;font-weight:600}
-.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-input[type=text],select{flex:1;min-width:220px;padding:9px 12px;border:1px solid var(--line);border-radius:7px;
-  background:var(--bg);color:var(--fg);font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
-input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:-1px}
-button{padding:9px 16px;border:1px solid var(--accent);border-radius:7px;background:var(--accent);
-  color:var(--bg);font-size:13px;font-weight:600;cursor:pointer}
-button.ghost{background:transparent;color:var(--fg);border-color:var(--line)}
-button:disabled{opacity:.4;cursor:not-allowed}
-label.check{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--dim)}
-.msg{font-size:13px;color:var(--dim);padding:6px 0}
-.msg.err{color:var(--fail)}
-.msg.ok{color:var(--pass)}
-textarea{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:7px;background:var(--bg);
-  color:var(--fg);font:14px/1.5 ui-sans-serif,system-ui,sans-serif;resize:vertical}
-summary{cursor:pointer;font-size:12px;color:var(--dim)}
-.keys{display:grid;gap:10px;margin-top:12px}
-.keys label{display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--dim)}
-.keys input{padding:8px 11px;border:1px solid var(--line);border-radius:7px;background:var(--bg);
-  color:var(--fg);font:12px ui-monospace,Menlo,monospace}
-.hide{display:none}
-.pill{font-size:10px;letter-spacing:.05em;font-weight:700;padding:2px 7px;border-radius:99px;text-transform:uppercase}
-.pill.pass{background:color-mix(in srgb,var(--pass) 16%,transparent);color:var(--pass)}
-.pill.fail{background:color-mix(in srgb,var(--fail) 16%,transparent);color:var(--fail)}
-.pill.skip,.pill.inc{background:color-mix(in srgb,var(--amb) 16%,transparent);color:var(--amb)}
+  font:16px/1.6 ui-sans-serif,system-ui,-apple-system,sans-serif}
 
-/* --- Chat --------------------------------------------------------------- */
-#messages{display:flex;flex-direction:column;gap:10px;max-height:520px;overflow-y:auto;padding:4px}
-.bubble{padding:10px 14px;border-radius:10px;border:1px solid var(--line);max-width:88%;
-  font-size:14px;line-height:1.5;white-space:pre-wrap;word-wrap:break-word}
-.bubble.user{background:var(--user);align-self:flex-end}
-.bubble.assistant{background:var(--assistant)}
-.bubble.tool{background:var(--tool);font:11.5px ui-monospace,SFMono-Regular,Menlo,monospace;
-  align-self:stretch;max-width:100%}
-.bubble.tool .head{font-weight:700;font-size:10px;letter-spacing:.05em;color:var(--dim);
-  text-transform:uppercase;margin-bottom:4px;display:flex;gap:8px;align-items:center}
-.bubble.tool.err{border-color:var(--fail);color:var(--fail)}
-.bubble.tool code{white-space:pre-wrap;word-break:break-all;display:block;color:var(--fg)}
-.chat-input{display:flex;gap:10px;margin-top:12px}
-.chat-input textarea{flex:1;min-height:60px;font:14px ui-sans-serif,system-ui,sans-serif}
-.tools-loaded{font-size:11px;color:var(--dim);padding:4px 0}
-.tools-loaded code{font-family:ui-monospace,Menlo,monospace}
+.navbar{border-bottom:1px solid var(--line);padding:14px 24px;display:flex;
+  align-items:center;justify-content:space-between;background:var(--card);
+  position:sticky;top:0;z-index:10}
+.navbar .brand{color:var(--fg);text-decoration:none;font-weight:600;letter-spacing:-.01em;font-size:16px}
+.navbar .links{display:flex;gap:20px;align-items:center}
+.navbar .links a{color:var(--dim);text-decoration:none;font-size:13px}
+.navbar .links a:hover{color:var(--fg)}
+.navbar .cta{padding:7px 14px;border:1px solid var(--accent);border-radius:7px;
+  background:var(--accent);color:var(--bg)!important;font-weight:600;font-size:13px}
 
-/* --- Verify (scan/repair) — collapsed by default ------------------------ */
-.verify summary{padding:10px 0}
-.grade{font-size:38px;font-weight:600;line-height:1;min-width:52px;text-align:center;padding:0 12px}
-.grade.A,.grade.B{color:var(--pass)}.grade.C{color:var(--amb)}
-.grade.D,.grade.F{color:var(--fail)}.grade\?{color:var(--dim)}
-.hero{display:none;align-items:center;gap:20px;padding:14px 0}
-.hero.on{display:flex}
-.stats{font-size:13px;color:var(--dim)}.stats b{color:var(--fg)}
-.progress{height:4px;background:var(--rail);border-radius:2px;overflow:hidden;margin-top:10px}
-.progress span{display:block;height:100%;width:0;background:var(--pass);transition:width .2s}
-.tool-scan{border-top:1px solid var(--line);padding:12px 0}
-.tool-scan h3{margin:0;font:13px ui-monospace,Menlo,monospace;display:flex;gap:10px;align-items:center}
-.find{display:grid;grid-template-columns:120px 1fr;gap:8px;font-size:12px;padding:6px 0 6px 10px;
-  border-left:2px solid transparent;margin-top:6px}
-.find.silent_success,.find.crash{border-left-color:var(--fail);background:color-mix(in srgb,var(--fail) 5%,transparent)}
-.find.ambiguous{border-left-color:var(--amb)}
-.v{font-weight:700;font-size:10px;letter-spacing:.05em}
-.v.silent_success,.v.crash{color:var(--fail)}.v.ambiguous{color:var(--amb)}.v.pass{color:var(--pass)}
-code.mono{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;word-break:break-all}
-pre.diff{background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:12px;
-  overflow-x:auto;font-size:11.5px;line-height:1.45;margin:10px 0 0}
-pre.diff .add{color:var(--pass)}pre.diff .del{color:var(--fail)}
+section{max-width:1020px;margin:0 auto;padding:80px 24px}
+section h2{font-size:12px;text-transform:uppercase;letter-spacing:.09em;color:var(--dim);
+  margin:0 0 22px;font-weight:600}
+
+/* --- Hero --- */
+.hero{padding-top:120px;padding-bottom:120px;background:var(--hero-glow);text-align:center}
+.hero h1{font-size:clamp(38px,6vw,64px);line-height:1.05;letter-spacing:-.03em;margin:0 0 24px;
+  font-weight:700}
+.hero .sub{font-size:clamp(16px,2vw,20px);color:var(--dim);max-width:640px;margin:0 auto 40px;line-height:1.5}
+.hero .cta-row{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.btn{display:inline-block;padding:14px 28px;border-radius:9px;text-decoration:none;
+  font-weight:600;font-size:15px;transition:transform .1s}
+.btn:hover{transform:translateY(-1px)}
+.btn.primary{background:var(--accent);color:var(--bg);border:1px solid var(--accent)}
+.btn.ghost{background:transparent;color:var(--fg);border:1px solid var(--line)}
+.hero .tag-line{margin-top:34px;color:var(--dim);font-size:13px;font-family:ui-monospace,Menlo,monospace}
+.hero .tag-line code{color:var(--fg)}
+
+/* --- How --- */
+.how .steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px}
+.step{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:24px}
+.step .num{font-size:11px;font-weight:700;letter-spacing:.1em;color:var(--pass);text-transform:uppercase}
+.step h3{margin:8px 0 10px;font-size:18px;letter-spacing:-.01em}
+.step p{margin:0;color:var(--dim);font-size:14px}
+.step code{background:var(--rail);padding:1px 6px;border-radius:4px;font-size:12.5px}
+
+/* --- Team --- */
+.team .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px}
+.member{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:22px}
+.member .avatar{width:52px;height:52px;border-radius:50%;background:var(--rail);display:flex;
+  align-items:center;justify-content:center;font-weight:700;font-size:20px;color:var(--dim);margin-bottom:14px}
+.member h3{margin:0 0 4px;font-size:16px}
+.member .role{font-size:12px;color:var(--dim);margin-bottom:10px;text-transform:uppercase;letter-spacing:.06em}
+.member p{margin:0;color:var(--dim);font-size:13.5px;line-height:1.55}
+.edit-hint{color:var(--dim);font-size:11.5px;margin-top:14px;font-family:ui-monospace,Menlo,monospace}
+
+/* --- Roadmap --- */
+.roadmap ol{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:14px}
+.roadmap li{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:20px 24px;
+  display:grid;grid-template-columns:110px 1fr;gap:20px;align-items:baseline}
+.roadmap .when{font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--pass);text-transform:uppercase}
+.roadmap .what{font-size:14.5px;color:var(--fg)}
+.roadmap .what b{color:var(--fg)}
+.roadmap .what .desc{color:var(--dim);font-size:13.5px;display:block;margin-top:4px}
+
+/* --- CTA banner + Footer --- */
+.cta-banner{background:var(--card);border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+  padding:60px 24px;text-align:center;margin-top:40px}
+.cta-banner h2{color:var(--fg);font-size:28px;letter-spacing:-.02em;text-transform:none;margin:0 0 12px;font-weight:600}
+.cta-banner p{color:var(--dim);margin:0 0 24px}
+footer{padding:30px 24px;text-align:center;color:var(--dim);font-size:12px}
+footer a{color:var(--dim)}
 </style>
 </head>
 <body>
-<main>
-  <h1>Tempered</h1>
-  <p class="tag">Describe an API. Tempered generates an MCP server for it, then you chat with a Claude-powered agent that uses it.</p>
-
-  <div class="panel">
-    <h2>Keys</h2>
-    <details id="keysDetails">
-      <summary id="keySummary">no keys set</summary>
-      <div class="keys">
-        <label>Anthropic API key (required for chat &amp; repair)
-          <input type="password" id="k_anthropic" placeholder="sk-ant-…"></label>
-        <label>API bearer token (optional — passed to the generated server as API_TOKEN)
-          <input type="password" id="k_token" placeholder="ghp_… / stripe test key / etc."></label>
-      </div>
-      <div class="row" style="margin-top:10px">
-        <button id="saveKeys" class="ghost">Save keys</button>
-        <span class="msg" id="keyMsg"></span>
-      </div>
-    </details>
+<nav class="navbar">
+  <a href="/" class="brand">Tempered</a>
+  <div class="links">
+    <a href="#how">How it works</a>
+    <a href="#team">Team</a>
+    <a href="#roadmap">Roadmap</a>
+    <a href="/demo" class="cta">Try demo</a>
   </div>
+</nav>
 
-  <div class="panel">
-    <h2>1 &nbsp;Generate an MCP server from an OpenAPI spec</h2>
-    <div class="row">
-      <select id="preset">
-        <option value="">— pick a preset —</option>
-      </select>
-      <span class="msg">or paste any OpenAPI URL:</span>
-    </div>
-    <div class="row" style="margin-top:10px">
-      <input type="text" id="spec" placeholder="https://petstore3.swagger.io/api/v3/openapi.json">
-      <button id="gen">Generate</button>
-    </div>
-    <div class="msg" id="genMsg"></div>
-    <div class="msg" id="presetHint"></div>
+<section class="hero">
+  <h1>Build any AI tool<br>from a sentence.</h1>
+  <p class="sub">Tempered turns a natural-language description into a working MCP server, lets you chat with an agent that uses it, and proves the tools don't quietly lie.</p>
+  <div class="cta-row">
+    <a href="/demo" class="btn primary">See the live demo →</a>
+    <a href="#how" class="btn ghost">How it works</a>
   </div>
+  <div class="tag-line"><code>$ tempered describe "a Slack poster that sends to a webhook"</code></div>
+</section>
 
-  <div class="panel hide" id="chatPanel">
-    <h2>2 &nbsp;Chat with your agent</h2>
-    <div class="tools-loaded" id="toolsLoaded"></div>
-    <div id="messages"></div>
-    <div class="chat-input">
-      <textarea id="chatInput" placeholder="Ask the agent to do something…"></textarea>
-      <button id="chatSend">Send</button>
+<section class="how" id="how">
+  <h2>How it works</h2>
+  <div class="steps">
+    <div class="step">
+      <div class="num">1 · Describe</div>
+      <h3>Say what you want in English.</h3>
+      <p>Claude writes a complete FastMCP server — real HTTP calls, typed inputs, meaningful errors. No boilerplate, no OpenAPI spec required.</p>
     </div>
-    <div class="row" style="margin-top:8px">
-      <button id="chatReset" class="ghost">New conversation</button>
-      <span class="msg" id="chatMsg"></span>
+    <div class="step">
+      <div class="num">2 · Chat</div>
+      <h3>Talk to your new agent.</h3>
+      <p>An in-browser chat panel loads the server's tools and hands them to Claude. Ask for something; it picks the right tool, calls the API, and answers.</p>
+    </div>
+    <div class="step">
+      <div class="num">3 · Verify</div>
+      <h3>Prove it doesn't lie.</h3>
+      <p>Tempered fires schema-directed adversarial payloads at every tool. Silent success — accepting bad input as if it worked — gets caught before the agent trusts it.</p>
     </div>
   </div>
+</section>
 
-  <details class="panel verify hide" id="verifyPanel">
-    <summary><b style="color:var(--fg)">3 &nbsp;Verify it works</b> — run Tempered's adversarial suite against the server before trusting it</summary>
-    <div class="row" style="margin-top:12px">
-      <button id="scan">Scan</button>
-      <button id="repair" class="ghost">Repair</button>
-      <label class="check"><input type="checkbox" id="writes"> also scan write tools</label>
+<section class="team" id="team">
+  <h2>Who we are</h2>
+  <div class="grid">
+    <div class="member">
+      <div class="avatar">S</div>
+      <h3>Siddhant Malik</h3>
+      <div class="role">Founder</div>
+      <p>Building Tempered at the hackathon. Interested in the seam where LLMs meet real infrastructure — and everything that goes wrong there.</p>
     </div>
-    <div class="msg" id="scanMsg"></div>
-    <div class="hero" id="hero">
-      <div class="grade" id="grade">·</div>
-      <div style="flex:1">
-        <div class="stats" id="stats"></div>
-        <div class="progress"><span id="bar"></span></div>
-      </div>
+    <div class="member">
+      <div class="avatar">?</div>
+      <h3>Your teammate</h3>
+      <div class="role">Role</div>
+      <p>Short bio. What they brought to the project.</p>
     </div>
-    <div id="scanResults"></div>
-    <div id="repairOut" class="hide"><h2 style="margin-top:14px">Repair</h2><div id="repairBody"></div></div>
-  </details>
-</main>
+    <div class="member">
+      <div class="avatar">?</div>
+      <h3>Your teammate</h3>
+      <div class="role">Role</div>
+      <p>Short bio. What they brought to the project.</p>
+    </div>
+  </div>
+  <div class="edit-hint">Edit team members in <code>tempered/static/index.html</code></div>
+</section>
 
-<script>
-const $ = id => document.getElementById(id);
-const esc = s => String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
-let currentServer = null;      // path to the generated MCP server .py
-let chatHistory = [];          // Anthropic-shape messages array
-let chatStream = null;
+<section class="roadmap" id="roadmap">
+  <h2>What's next</h2>
+  <ol>
+    <li>
+      <div class="when">Near-term</div>
+      <div class="what"><b>More preset connectors and GitHub Actions integration.</b>
+        <span class="desc">A pre-verified catalogue of common APIs, plus <code>tempered test</code> as a CI gate so a regression in the API spec fails the PR.</span></div>
+    </li>
+    <li>
+      <div class="when">Mid-term</div>
+      <div class="what"><b>Continuous conformance monitoring.</b>
+        <span class="desc">Watch every published MCP server for schema drift and silent-success regressions. Alert on the ones that stop rejecting what they should.</span></div>
+    </li>
+    <li>
+      <div class="when">Mid-term</div>
+      <div class="what"><b>A public "verified" badge for MCP servers.</b>
+        <span class="desc">Auditable pass rate any SaaS vendor can put next to their listing. Standards win by adoption, not by features.</span></div>
+    </li>
+    <li>
+      <div class="when">Long-term</div>
+      <div class="what"><b>The conformance bar the ecosystem cites.</b>
+        <span class="desc">Registries and agent platforms adopt Tempered's suite as the ingestion gate. Broken servers stop reaching agents in the first place.</span></div>
+    </li>
+  </ol>
+</section>
 
-// --- Keys -----------------------------------------------------------------
-async function loadKeys() {
-  try {
-    const d = await (await fetch('/api/keys')).json();
-    const set = d.set || {}, n = Object.values(set).filter(Boolean).length;
-    $('keySummary').textContent = n
-      ? `${n} key${n > 1 ? 's' : ''} set (${Object.keys(set).filter(k => set[k]).join(', ')})`
-      : 'no keys set — click to add';
-  } catch (e) { /* leave blank */ }
-}
-$('saveKeys').onclick = async () => {
-  const body = {
-    ANTHROPIC_API_KEY: $('k_anthropic').value.trim(),
-    API_TOKEN: $('k_token').value.trim(),
-  };
-  try {
-    await fetch('/api/keys', {method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify(body)});
-    ['k_anthropic','k_token'].forEach(id => $(id).value = '');
-    $('keyMsg').textContent = 'saved'; $('keyMsg').className = 'msg ok';
-    await loadKeys();
-  } catch (e) { $('keyMsg').textContent = String(e.message||e); $('keyMsg').className='msg err'; }
-};
+<div class="cta-banner">
+  <h2>See it in action.</h2>
+  <p>Two minutes. One sentence in, a working agent out.</p>
+  <a href="/demo" class="btn primary">Open the demo →</a>
+</div>
 
-// --- Presets --------------------------------------------------------------
-async function loadPresets() {
-  try {
-    const d = await (await fetch('/api/presets')).json();
-    (d.presets || []).forEach(p => {
-      const o = document.createElement('option');
-      o.value = p.spec; o.textContent = p.label; o.dataset.hint = p.hint || '';
-      $('preset').appendChild(o);
-    });
-  } catch (e) { /* leave blank */ }
-}
-$('preset').onchange = e => {
-  const opt = e.target.selectedOptions[0];
-  if (opt && opt.value) {
-    $('spec').value = opt.value;
-    $('presetHint').textContent = opt.dataset.hint || '';
-  } else { $('presetHint').textContent = ''; }
-};
+<footer>
+  Tempered · built at a hackathon · <a href="https://github.com/">source</a>
+</footer>
 
-// --- Generate -------------------------------------------------------------
-$('gen').onclick = async () => {
-  const spec = $('spec').value.trim();
-  if (!spec) { $('genMsg').textContent = 'paste a spec URL or pick a preset'; $('genMsg').className='msg err'; return; }
-  $('gen').disabled = true;
-  $('genMsg').className = 'msg'; $('genMsg').textContent = 'fetching spec and generating…';
-  try {
-    const r = await fetch('/api/generate', {method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({spec})});
-    const d = await r.json();
-    if (!r.ok) throw new Error(d.error || 'generate failed');
-    currentServer = d.server;
-    $('genMsg').className = 'msg ok';
-    $('genMsg').textContent = `wrote ${d.server} — ${d.tools} tools (${d.writes} write tools)`;
-    resetChat();
-    $('chatPanel').classList.remove('hide');
-    $('verifyPanel').classList.remove('hide');
-    $('chatInput').focus();
-  } catch (e) {
-    $('genMsg').className = 'msg err';
-    $('genMsg').textContent = String(e.message || e);
-  } finally { $('gen').disabled = false; }
-};
-
-// --- Chat -----------------------------------------------------------------
-function bubble(kind, html) {
-  const el = document.createElement('div');
-  el.className = 'bubble ' + kind;
-  el.innerHTML = html;
-  $('messages').appendChild(el);
-  $('messages').scrollTop = $('messages').scrollHeight;
-  return el;
-}
-function resetChat() {
-  chatHistory = [];
-  $('messages').innerHTML = '';
-  $('toolsLoaded').textContent = '';
-  $('chatMsg').textContent = '';
-}
-$('chatReset').onclick = resetChat;
-
-function pretty(obj) {
-  try { return JSON.stringify(obj, null, 2); } catch { return String(obj); }
-}
-
-$('chatSend').onclick = () => sendChat();
-$('chatInput').addEventListener('keydown', e => {
-  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); sendChat(); }
-});
-
-async function sendChat() {
-  const text = $('chatInput').value.trim();
-  if (!text) return;
-  if (!currentServer) { $('chatMsg').textContent = 'generate a server first'; $('chatMsg').className='msg err'; return; }
-  if (chatStream) { $('chatMsg').textContent = 'still thinking…'; return; }
-
-  $('chatInput').value = '';
-  bubble('user', esc(text));
-  const userMsg = {role:'user', content:text};
-  const sendHistory = [...chatHistory, userMsg];
-
-  $('chatSend').disabled = true;
-  $('chatMsg').textContent = 'thinking…'; $('chatMsg').className = 'msg';
-
-  // POST-then-SSE is unusual; use fetch + ReadableStream instead.
-  try {
-    const r = await fetch('/api/chat', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({server: currentServer, messages: sendHistory}),
-    });
-    if (!r.ok) { const d = await r.json().catch(()=>({})); throw new Error(d.error || `HTTP ${r.status}`); }
-    const reader = r.body.getReader();
-    const decoder = new TextDecoder();
-    let buf = '';
-    while (true) {
-      const {done, value} = await reader.read();
-      if (done) break;
-      buf += decoder.decode(value, {stream:true});
-      // SSE frames are separated by \n\n; each frame's payload is on `data: ` lines
-      let idx;
-      while ((idx = buf.indexOf('\n\n')) >= 0) {
-        const frame = buf.slice(0, idx); buf = buf.slice(idx + 2);
-        const payload = frame.split('\n').filter(l => l.startsWith('data:'))
-          .map(l => l.slice(5).trimStart()).join('\n');
-        if (payload) onChatEvent(JSON.parse(payload));
-      }
-    }
-  } catch (e) {
-    $('chatMsg').textContent = String(e.message || e); $('chatMsg').className='msg err';
-  } finally {
-    $('chatSend').disabled = false; chatStream = null;
-    if ($('chatMsg').className === 'msg') $('chatMsg').textContent = '';
-  }
-}
-
-function onChatEvent(d) {
-  if (d.type === 'tools_loaded') {
-    $('toolsLoaded').innerHTML = `${d.count} tools loaded: ` +
-      d.names.slice(0, 8).map(n => `<code>${esc(n)}</code>`).join(', ') +
-      (d.names.length > 8 ? ` <span>+${d.names.length-8} more</span>` : '');
-  } else if (d.type === 'text') {
-    bubble('assistant', esc(d.text));
-  } else if (d.type === 'tool_use') {
-    bubble('tool',
-      `<div class="head"><span class="pill pass">call</span> ${esc(d.name)}</div>` +
-      `<code>${esc(pretty(d.input))}</code>`);
-  } else if (d.type === 'tool_result') {
-    bubble(`tool ${d.is_error ? 'err' : ''}`,
-      `<div class="head"><span class="pill ${d.is_error ? 'fail' : 'pass'}">` +
-      `${d.is_error ? 'error' : 'result'}</span></div>` +
-      `<code>${esc(String(d.content).slice(0, 800))}</code>`);
-  } else if (d.type === 'done') {
-    chatHistory = d.messages;   // authoritative history from the server
-  } else if (d.type === 'error') {
-    $('chatMsg').textContent = d.message; $('chatMsg').className='msg err';
-  }
-}
-
-// --- Scan / Repair --------------------------------------------------------
-let scanStream = null, scanTools = {}, seen = 0, expected = 0;
-function resetScan() {
-  if (scanStream) { scanStream.close(); scanStream = null; }
-  scanTools = {}; seen = 0; expected = 0;
-  $('scanResults').innerHTML = '';
-  $('repairOut').classList.add('hide'); $('repairBody').innerHTML = '';
-  $('hero').classList.remove('on'); $('bar').style.width = '0';
-  $('scanMsg').textContent = ''; $('scanMsg').className = 'msg';
-}
-function toolBlock(name) {
-  if (scanTools[name]) return scanTools[name];
-  const el = document.createElement('div');
-  el.className = 'tool-scan';
-  el.innerHTML = `<h3>${esc(name)} <span class="pill pass" data-pill>running</span></h3><div data-body></div>`;
-  $('scanResults').appendChild(el);
-  scanTools[name] = el;
-  return el;
-}
-function onScanEvent(ev) {
-  const d = JSON.parse(ev.data);
-  if (d.type === 'start') {
-    $('hero').classList.add('on');
-    $('grade').textContent='·'; $('grade').className='grade';
-    $('stats').innerHTML = `scanning <b>${d.tools.length}</b> tools…`;
-  } else if (d.type === 'tool_start') { expected += d.checks; toolBlock(d.tool); }
-  else if (d.type === 'tool_skipped') {
-    const el = toolBlock(d.tool);
-    el.querySelector('[data-pill]').className='pill skip';
-    el.querySelector('[data-pill]').textContent='skipped';
-    el.querySelector('[data-body]').innerHTML = `<div class="msg">${esc(d.reason)}</div>`;
-  } else if (d.type === 'tool_inconclusive') {
-    const el = toolBlock(d.tool);
-    el.querySelector('[data-pill]').className='pill inc';
-    el.querySelector('[data-pill]').textContent='inconclusive';
-    el.querySelector('[data-body]').innerHTML = `<div class="msg">${esc(d.note)}</div>`;
-  } else if (d.type === 'finding') {
-    seen++;
-    if (expected) $('bar').style.width = Math.min(100, seen/expected*100) + '%';
-    if (d.verdict === 'pass') return;
-    const body = toolBlock(d.tool).querySelector('[data-body]');
-    const row = document.createElement('div');
-    row.className = 'find ' + d.verdict;
-    row.innerHTML = `<div class="v ${d.verdict}">${esc(d.verdict.replace('_',' ').toUpperCase())}</div>
-      <div><code class="mono">${esc(d.field)}</code> — ${esc(d.detail)}
-        <div class="msg"><b>sent</b> <code class="mono">${esc(JSON.stringify(d.payload))}</code></div>
-        <div class="msg"><b>got</b> <code class="mono">${esc(String(d.response).slice(0,160))}</code></div></div>`;
-    body.appendChild(row);
-  } else if (d.type === 'tool_done') {
-    const el = scanTools[d.tool]; if (!el) return;
-    const pill = el.querySelector('[data-pill]');
-    const failed = el.querySelectorAll('.find.silent_success, .find.crash').length;
-    pill.className = 'pill ' + (failed ? 'fail' : 'pass');
-    pill.textContent = failed ? `${failed} failing` : 'clean';
-  } else if (d.type === 'done') {
-    $('grade').textContent = d.grade; $('grade').className='grade ' + d.grade;
-    $('bar').style.width = '100%';
-    $('stats').innerHTML = `<b>${Math.round(d.pass_rate*100)}%</b> pass rate · ` +
-      `<b>${d.total_checks}</b> checks · ` +
-      (d.failures ? `<b>${d.failures}</b> failing` : 'no failures') +
-      (d.inconclusive ? ` · ${d.inconclusive} inconclusive` : '') +
-      (d.skipped ? ` · ${d.skipped} skipped` : '');
-    finishScan();
-  } else if (d.type === 'repair_start') {
-    $('repairOut').classList.remove('hide');
-    $('repairBody').innerHTML = '<div class="msg">scanning, then patching…</div>';
-  } else if (d.type === 'attempt') {
-    const diff = esc(d.diff).split('\n').map(l =>
-      l.startsWith('+') ? `<span class="add">${l}</span>` :
-      l.startsWith('-') ? `<span class="del">${l}</span>` : l).join('\n');
-    $('repairBody').insertAdjacentHTML('beforeend',
-      `<div class="tool-scan"><h3>attempt ${d.number}
-        <span class="pill ${d.kept ? 'pass' : 'skip'}">${d.kept ? 'kept' : 'rejected'}</span>
-        <span class="msg">→ ${esc(d.grade)} ${Math.round(d.pass_rate*100)}%</span></h3>
-        <pre class="diff">${diff}</pre></div>`);
-  } else if (d.type === 'repair_done') {
-    $('repairBody').insertAdjacentHTML('beforeend',
-      `<div class="msg"><b>${esc(d.before.grade)} ${Math.round(d.before.pass_rate*100)}%</b>
-       → <b>${esc(d.after.grade)} ${Math.round(d.after.pass_rate*100)}%</b>
-       ${d.fixed ? '· all checks passing' : '· some checks still failing'}</div>`);
-    finishScan();
-  } else if (d.type === 'error') { failScan(d.message); }
-}
-function finishScan() {
-  if (scanStream) { scanStream.close(); scanStream = null; }
-  $('scan').disabled = false; $('repair').disabled = false;
-}
-function failScan(msg) { $('scanMsg').textContent=msg; $('scanMsg').className='msg err'; finishScan(); }
-function openScan(url) {
-  $('scan').disabled=true; $('repair').disabled=true;
-  scanStream = new EventSource(url);
-  scanStream.onmessage = onScanEvent;
-  scanStream.onerror = () => { if (scanStream) failScan('connection to the scanner dropped'); };
-}
-$('scan').onclick = () => {
-  if (!currentServer) return failScan('generate a server first');
-  resetScan();
-  openScan(`/api/scan?source=${encodeURIComponent(currentServer)}&allow_writes=${$('writes').checked?1:0}`);
-};
-$('repair').onclick = () => {
-  if (!currentServer) return failScan('generate a server first');
-  resetScan();
-  openScan(`/api/repair?source=${encodeURIComponent(currentServer)}`);
-};
-
-loadKeys();
-loadPresets();
-</script>
 </body>
 </html>
