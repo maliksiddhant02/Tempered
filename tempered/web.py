@@ -29,7 +29,16 @@ STATIC = Path(__file__).parent / "static"
 async def _pump(run: Any) -> AsyncIterator[dict[str, Any]]:
     """Run an async job that emits events into a queue, yielding them as they land."""
     queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
-    task = asyncio.create_task(run(queue.put_nowait))
+
+    async def guarded(emit: Any) -> None:
+        # BaseException too: a SystemExit from anything downstream would
+        # otherwise unwind the event loop and take the whole server with it.
+        try:
+            await run(emit)
+        except BaseException as exc:  # noqa: BLE001
+            emit({"type": "error", "message": f"{type(exc).__name__}: {exc}"})
+
+    task = asyncio.create_task(guarded(queue.put_nowait))
 
     while True:
         try:
@@ -42,7 +51,7 @@ async def _pump(run: Any) -> AsyncIterator[dict[str, Any]]:
     while not queue.empty():  # drain anything emitted after the last poll
         yield {"data": _dumps(queue.get_nowait())}
 
-    if error := task.exception():
+    if not task.cancelled() and (error := task.exception()):
         yield {"data": _dumps({"type": "error", "message": f"{type(error).__name__}: {error}"})}
 
 
@@ -100,6 +109,19 @@ async def api_repair(request: Request) -> EventSourceResponse:
     source = request.query_params.get("source", "").strip()
     if not source:
         return JSONResponse({"error": "source is required"}, status_code=400)
+
+    from .repair import credentials_available
+
+    if not credentials_available():
+        # EventSource cannot read a 400 body, so send the reason down the stream
+        # where the page can actually show it.
+        async def refuse(emit: Any) -> None:
+            emit({
+                "type": "error",
+                "message": "repair needs ANTHROPIC_API_KEY set before you start the server",
+            })
+
+        return EventSourceResponse(_pump(refuse))
 
     async def run(emit: Any) -> None:
         from .repair import repair

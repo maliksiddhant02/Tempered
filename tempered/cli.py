@@ -62,11 +62,15 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _repair(opts: argparse.Namespace) -> int:
-    from .repair import repair, summary
+    from .repair import MissingCredentials, repair, summary
 
     source = Path(opts.source)
     label = opts.name or source.stem
-    result = asyncio.run(repair(source, opts.cmd, [str(source)], label))
+    try:
+        result = asyncio.run(repair(source, opts.cmd, [str(source)], label))
+    except MissingCredentials as exc:
+        print(f"  {exc}", file=sys.stderr)
+        return 2
 
     if opts.show_diff:
         for attempt in result.attempts:

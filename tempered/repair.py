@@ -48,6 +48,14 @@ Rules:
 Return the COMPLETE corrected file in a single ```python code block. No commentary."""
 
 
+class MissingCredentials(RuntimeError):
+    """No Anthropic credentials. Never SystemExit - this runs inside a server too."""
+
+
+def credentials_available() -> bool:
+    return bool(os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN"))
+
+
 @dataclass
 class Attempt:
     number: int
@@ -109,8 +117,10 @@ async def repair(
     source_path: Path, command: str, args: list[str], label: str, verbose: bool = True
 ) -> RepairResult:
     """Scan, patch, re-verify. At most MAX_ATTEMPTS patches, best result kept."""
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        raise SystemExit("repair needs ANTHROPIC_API_KEY (or an `ant auth login` profile)")
+    if not credentials_available():
+        raise MissingCredentials(
+            "repair needs ANTHROPIC_API_KEY (or an `ant auth login` profile)"
+        )
 
     original = source_path.read_text(encoding="utf-8")
     before = await scan(command, args, label)
