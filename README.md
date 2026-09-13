@@ -1,32 +1,30 @@
 # Tempered
 
-Build any AI tool from a sentence. Describe what you want, and Tempered writes a
-working MCP server for it, hands the tools to an agent you can chat with, then
-attacks each tool to check it doesn't quietly lie.
+Build any AI tool from a sentence. Describe what you want, and Tempered writes the
+MCP server, hands the tools to an agent you can chat with, and checks each tool
+does what it claims.
 
-Here's the problem it exists for. An MCP server can accept bad input and still
-reply as if the call worked, so the agent trusts a result that never happened. We
-call that a silent success. Tempered builds the server, sends malformed input at
-every tool, grades what the tool catches, and rewrites the ones that let junk
-through.
+The problem: an MCP server can take bad input and still reply as if it worked, so
+the agent trusts a result that never happened. We call that a silent success.
+Tempered throws bad input at every tool, grades what it catches, and fixes the ones
+that let junk through.
 
 ## 01 · Project overview
 
-`python -m tempered.cli serve` starts a local web app with two pages. The landing
-page explains the idea. The live demo is where the work happens, and there are
-three ways to get a server:
+Run `python -m tempered.cli serve` and open the live demo. There are three ways to
+get a server:
 
-- Describe it in plain English, like "a Slack poster that sends to a webhook", and
-  Claude writes the MCP server.
-- Paste an OpenAPI URL and Tempered generates the server from the spec.
-- Load one of eight ready-made presets in a single click.
+- Click one of eight ready-made presets.
+- Describe a tool in plain English ("a Slack poster that sends to a webhook") and
+  Claude writes it.
+- Paste an OpenAPI URL and Tempered builds it from the spec.
 
-Once a server exists, chat with an agent that holds its tools. Ask for something
-and the agent picks a tool, calls the API, and answers. Then open Verify to scan
-the server with adversarial input, read its grade, and repair whatever fails.
+Then chat with an agent that has the server's tools: ask for something and it picks
+a tool, calls the API, and answers. Open Verify to hit the tools with bad input,
+see a grade, and repair whatever fails.
 
-It all runs on your machine. Keys stay in the process memory or your `.env`. They
-are never written to disk from the browser and never sent back to the page.
+Everything runs on your machine. Keys stay in memory or your `.env` — never written
+to disk from the browser, never sent back to the page.
 
 ## 02 · External apps used
 
@@ -72,17 +70,17 @@ python test_tempered.py
   write safety     POST skipped by default, scanned with --allow-writes
 ```
 
-For each tool's schema, Tempered sends one payload per rule, and each payload
-breaks exactly one thing: a wrong type, a missing field, a value past the length
-limit, a stray key. A clear error is a pass. A success reply to bad input is a
-silent success, the bug we hunt. The pass rate becomes a grade from A to F.
+Tempered sends one bad payload per schema rule, each breaking exactly one thing: a
+wrong type, a missing field, an over-long value, a stray key. Reject it and the
+tool passes. Accept it and that's a silent success — the bug we hunt. The pass rate
+becomes a grade, A to F.
 
-It catches real ones. FastMCP's generated servers don't enforce their own schemas,
-so a fresh connector scores F. Repair rewrites it to validate input and runs the
-scan again, usually moving it from F to A in one pass while it still handles valid
-calls. The harness stays honest too: a known-good server has to score A, sensible
-type coercions aren't counted against a tool, unreachable tools get no grade, and
-adversarial writes hit a local sink during testing instead of the real API.
+It catches real ones. Servers FastMCP generates don't enforce their own schemas, so
+a fresh connector scores F. Repair rewrites it to check its input and re-runs the
+scan, usually taking it F to A in one pass — and valid calls still work. The harness
+plays fair too: a known-good server must score A, sensible type coercions don't
+count against a tool, unreachable tools get no grade, and test writes hit a local
+sink, never the real API.
 
 The same check runs from the command line as a CI gate:
 
