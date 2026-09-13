@@ -1,0 +1,5 @@
+{
+  "search_repos": "get",
+  "get_user": "get",
+  "create_issue": "post"
+}

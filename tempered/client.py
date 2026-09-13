@@ -6,6 +6,7 @@ outcome of a tool call into one of four verdicts the checks can reason about.
 
 from __future__ import annotations
 
+import os
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any, AsyncIterator
@@ -79,8 +80,18 @@ class Server:
 async def connect(
     command: str, args: list[str] | None = None, env: dict[str, str] | None = None
 ) -> AsyncIterator[Server]:
-    """Spawn an MCP server over stdio and hand back a connected session."""
-    params = StdioServerParameters(command=command, args=args or [], env=env)
+    """Spawn an MCP server over stdio and hand back a connected session.
+
+    With no explicit `env`, the child inherits this process's full environment,
+    like any normally-launched subprocess — so keys the UI/.env put in os.environ
+    (GITHUB_TOKEN, DISCORD_WEBHOOK_URL, …) actually reach the generated server.
+    The SDK otherwise passes only a safe OS subset, which would starve every
+    connector of its credentials. An explicit `env` (e.g. a scan's safe sink) is
+    used as-is, so that isolation still holds.
+    """
+    params = StdioServerParameters(
+        command=command, args=args or [], env=env if env is not None else dict(os.environ)
+    )
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()

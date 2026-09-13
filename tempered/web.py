@@ -31,7 +31,10 @@ STATIC = Path(__file__).parent / "static"
 CHAT_KEYS = (
     "ANTHROPIC_API_KEY",       # chat, describe, repair
     "SLACK_WEBHOOK_URL",       # generated Slack tools
-    "GITHUB_TOKEN",            # generated GitHub tools
+    "GITHUB_TOKEN",            # GitHub preset: raises read limits, opens issues
+    "DISCORD_WEBHOOK_URL",     # Discord preset: post via webhook
+    "UNSPLASH_ACCESS_KEY",     # Unsplash preset: photo search
+    "NASA_API_KEY",            # NASA preset: optional, falls back to DEMO_KEY
     "OPENAI_API_KEY",          # generated OpenAI tools
     "API_TOKEN",               # generic bearer for OpenAPI-derived servers
 )
@@ -289,7 +292,7 @@ Given the user's description of an app, output a COMPLETE, RUNNABLE Python file.
 Required shape:
 
     import os
-    import httpx
+    import httpx2 as httpx
     from fastmcp import FastMCP
 
     mcp = FastMCP("some-descriptive-name")
@@ -384,15 +387,35 @@ async def api_describe(request: Request) -> JSONResponse:
 
 # --- Presets ------------------------------------------------------------------
 
-# Curated apps with public OpenAPI specs. Only ones verified to actually load
-# go here — a broken preset in the demo is worse than fewer presets.
+# Ready-to-run connectors judges can try immediately. `server` presets are
+# pre-built and load in one click; the `spec` preset generates live from an
+# OpenAPI URL. `needs` names an env key required to DO anything (reads still work
+# without it) — every keyless preset runs the moment the server starts.
 PRESETS = [
-    {
-        "id": "petstore",
-        "label": "Petstore (demo, no auth)",
-        "spec": "https://petstore3.swagger.io/api/v3/openapi.json",
-        "hint": "Try: 'find pets with status available' or 'add a new pet named Rex'",
-    },
+    {"id": "open-meteo", "label": "Open-Meteo · weather (no key)",
+     "server": "presets/open_meteo_server.py", "needs": "",
+     "hint": "Try: “what's the weather in Tokyo?” — it geocodes, then fetches."},
+    {"id": "coingecko", "label": "CoinGecko · crypto prices (no key)",
+     "server": "presets/coingecko_server.py", "needs": "",
+     "hint": "Try: “price of bitcoin and ethereum in usd” or “what's trending?”"},
+    {"id": "nasa-apod", "label": "NASA · astronomy pic of the day (no key)",
+     "server": "presets/nasa_apod_server.py", "needs": "",
+     "hint": "Try: “show the astronomy picture for 2024-01-01” or “a random one”."},
+    {"id": "pollinations", "label": "Pollinations · AI image + text (no key)",
+     "server": "presets/pollinations_server.py", "needs": "",
+     "hint": "Try: “generate an image of a fox in a spacesuit”."},
+    {"id": "github", "label": "GitHub · REST API (reads: no key)",
+     "server": "presets/github_server.py", "needs": "",
+     "hint": "Try: “find popular python repos” or “who is torvalds?” — set GITHUB_TOKEN in Keys to open issues."},
+    {"id": "unsplash", "label": "Unsplash · photo search (key set in .env)",
+     "server": "presets/unsplash_server.py", "needs": "UNSPLASH_ACCESS_KEY",
+     "hint": "Try: “find 5 photos of mountains”."},
+    {"id": "discord", "label": "Discord · post via webhook (needs webhook)",
+     "server": "presets/discord_server.py", "needs": "DISCORD_WEBHOOK_URL",
+     "hint": "Add a Discord webhook in Keys, then: “post ‘hello team’ to discord”."},
+    {"id": "petstore", "label": "Petstore · OpenAPI demo (generates, scores F → harden)",
+     "spec": "https://petstore3.swagger.io/api/v3/openapi.json", "needs": "",
+     "hint": "Generates a connector from the OpenAPI spec, then Repair takes it F → A."},
 ]
 
 

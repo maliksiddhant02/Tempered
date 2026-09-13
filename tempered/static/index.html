@@ -1,103 +1,164 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Tempered — build any AI tool from a sentence</title>
+<title>Tempered: build any AI tool from a sentence</title>
+<link rel="preconnect" href="https://api.fontshare.com" crossorigin>
+<link href="https://api.fontshare.com/v2/css?f[]=clash-display@500,600,700&display=swap" rel="stylesheet">
 <style>
-:root{color-scheme:light dark;--bg:#fbfaf9;--fg:#1a1a1a;--dim:#6b6b6b;--line:#e4e1dd;
-  --card:#fff;--pass:#2f7d4f;--fail:#c0392b;--amb:#9a7b28;--accent:#1a1a1a;--rail:#f2f0ee;
-  --hero-glow:radial-gradient(circle at 50% 0%,color-mix(in srgb,var(--pass) 12%,transparent),transparent 60%)}
-@media(prefers-color-scheme:dark){:root{--bg:#16161a;--fg:#e8e6e3;--dim:#9a9a9a;--line:#2c2c33;
-  --card:#1d1d22;--pass:#57b87f;--fail:#e57366;--amb:#d4ac52;--accent:#e8e6e3;--rail:#202027}}
+/* --- Remotion design system -------------------------------------------------
+   blue #0b84f3 · near-black surfaces · 8px radii · GT Planar(900)→Inter display */
+:root{
+  color-scheme:dark;
+  --bg:#0b0b0d;          /* page near-black */
+  --surface:#161618;     /* cards, panels */
+  --surface-2:#242526;   /* nav / elevated */
+  --chip:#333;           /* command chip */
+  --btn:#424243;         /* secondary button */
+  --btn-hover:#535354;
+  --border:#2a2a2e;
+  --border-hi:#3a3a3f;
+  --fg:#fff;
+  --fg-soft:#e3e3e3;
+  --dim:#9a9aa2;
+  --primary:#0b84f3;
+  --primary-light:#2290f5;
+  --primary-dark:#0a77db;
+  --pass:#4dbf4d;--fail:#fa5c60;--amb:#ffba00;
+  --rail:#1d1d20;
+  --radius:8px;
+  --font-sans:system-ui,-apple-system,"Segoe UI",Roboto,Ubuntu,Cantarell,"Noto Sans",sans-serif;
+  --font-display:"Clash Display",var(--font-sans);
+  --font-mono:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace;
+}
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
-body{margin:0;background:var(--bg);color:var(--fg);
-  font:16px/1.6 ui-sans-serif,system-ui,-apple-system,sans-serif}
+body{margin:0;background:var(--bg);color:var(--fg-soft);overflow-x:clip;
+  font:16px/1.65 var(--font-sans);-webkit-font-smoothing:antialiased;font-synthesis:none}
+h1,h2,h3{font-family:var(--font-display);color:var(--fg)}
 
-.navbar{border-bottom:1px solid var(--line);padding:14px 24px;display:flex;
-  align-items:center;justify-content:space-between;background:var(--card);
+.navbar{border-bottom:1px solid var(--border);padding:12px 24px;display:flex;
+  align-items:center;justify-content:space-between;background:var(--surface);
   position:sticky;top:0;z-index:10}
-.navbar .brand{color:var(--fg);text-decoration:none;font-weight:600;letter-spacing:-.01em;font-size:16px}
-.navbar .links{display:flex;gap:20px;align-items:center}
-.navbar .links a{color:var(--dim);text-decoration:none;font-size:13px}
-.navbar .links a:hover{color:var(--fg)}
-.navbar .cta{padding:7px 14px;border:1px solid var(--accent);border-radius:7px;
-  background:var(--accent);color:var(--bg)!important;font-weight:600;font-size:13px}
+.navbar .brand{color:var(--fg);text-decoration:none;font-family:var(--font-display);
+  font-weight:900;letter-spacing:-.03em;font-size:19px}
+.navbar .links{display:flex;gap:8px;align-items:center}
+.navbar .links a{color:var(--fg-soft);text-decoration:none;font-size:14px;font-weight:500;
+  padding:6px 12px;border-radius:6px;transition:color .2s,background .2s}
+.navbar .links a:hover{color:var(--fg);background:var(--surface-2)}
+.navbar .cta{background:var(--btn);color:#fff!important;font-weight:600;
+  border:1.5px solid var(--primary);box-shadow:2px 2px 0 0 var(--primary);
+  transition:transform .12s ease,box-shadow .12s ease,background .18s}
+.navbar .cta:hover{background:var(--btn);transform:translate(1px,1px);box-shadow:1px 1px 0 0 var(--primary)}
+.navbar .cta:active{transform:translate(2px,2px);box-shadow:none}
 
-section{max-width:1020px;margin:0 auto;padding:80px 24px}
-section h2{font-size:12px;text-transform:uppercase;letter-spacing:.09em;color:var(--dim);
-  margin:0 0 22px;font-weight:600}
+section{max-width:1040px;margin:0 auto;padding:90px 24px}
+section h2{font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:var(--primary);
+  margin:0 0 26px;font-weight:700;font-family:var(--font-sans)}
 
 /* --- Hero --- */
-.hero{padding-top:120px;padding-bottom:120px;background:var(--hero-glow);text-align:center}
-.hero h1{font-size:clamp(38px,6vw,64px);line-height:1.05;letter-spacing:-.03em;margin:0 0 24px;
+.hero{position:relative;max-width:none;padding:130px 24px 120px;text-align:center;overflow:hidden;
+  border-bottom:1px solid var(--border)}
+.hero .swoosh{position:absolute;inset:0;width:100%;height:100%;max-width:none;margin:0;z-index:0;
+  pointer-events:none;opacity:.92;transform-origin:50% 50%;
+  animation:swoosh-drift 24s ease-in-out infinite;will-change:transform}
+@keyframes swoosh-drift{
+  0%{transform:translate3d(-2%,0,0) rotate(-1.2deg)}
+  22%{transform:translate3d(1.5%,-2.6%,0) rotate(.4deg)}
+  48%{transform:translate3d(3%,1.6%,0) rotate(1.3deg)}
+  74%{transform:translate3d(.4%,-1.2%,0) rotate(.1deg)}
+  100%{transform:translate3d(-2%,0,0) rotate(-1.2deg)}
+}
+@media(prefers-reduced-motion:reduce){.hero .swoosh{animation:none}}
+.hero > *{position:relative;z-index:1;max-width:900px;margin-left:auto;margin-right:auto}
+.hero h1{font-size:clamp(44px,8vw,92px);line-height:1;letter-spacing:-.015em;margin:0 auto 26px;
   font-weight:700}
-.hero .sub{font-size:clamp(16px,2vw,20px);color:var(--dim);max-width:640px;margin:0 auto 40px;line-height:1.5}
+.hero .sub{font-size:clamp(17px,2vw,21px);color:var(--dim);max-width:600px;margin:0 auto 40px;line-height:1.5}
 .hero .cta-row{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
-.btn{display:inline-block;padding:14px 28px;border-radius:9px;text-decoration:none;
-  font-weight:600;font-size:15px;transition:transform .1s}
-.btn:hover{transform:translateY(-1px)}
-.btn.primary{background:var(--accent);color:var(--bg);border:1px solid var(--accent)}
-.btn.ghost{background:transparent;color:var(--fg);border:1px solid var(--line)}
-.hero .tag-line{margin-top:34px;color:var(--dim);font-size:13px;font-family:ui-monospace,Menlo,monospace}
-.hero .tag-line code{color:var(--fg)}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:12px 22px;border-radius:var(--radius);
+  text-decoration:none;font-weight:600;font-size:15px;border:1.5px solid var(--dim);
+  background:var(--surface-2);color:var(--fg);box-shadow:3px 3px 0 0 var(--dim);
+  transition:transform .12s ease,box-shadow .12s ease,background .18s}
+.btn:hover{transform:translate(2px,2px);box-shadow:1px 1px 0 0 var(--dim)}
+.btn:active{transform:translate(3px,3px);box-shadow:none}
+.btn.primary{background:var(--btn);border-color:var(--primary);box-shadow:3px 3px 0 0 var(--primary)}
+.btn.primary:hover{box-shadow:1px 1px 0 0 var(--primary)}
+.btn.primary:active{box-shadow:none}
+.hero .tag-line{display:inline-block;margin-top:34px;background:var(--chip);border-radius:var(--radius);
+  padding:9px 18px;color:#fff;font-size:14px;font-family:var(--font-mono)}
+.hero .tag-line code{color:#fff}
+.hero .tag-line .prompt{color:var(--primary-light);margin-right:4px}
 
 /* --- How --- */
-.how .steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px}
-.step{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:24px}
-.step .num{font-size:11px;font-weight:700;letter-spacing:.1em;color:var(--pass);text-transform:uppercase}
-.step h3{margin:8px 0 10px;font-size:18px;letter-spacing:-.01em}
-.step p{margin:0;color:var(--dim);font-size:14px}
-.step code{background:var(--rail);padding:1px 6px;border-radius:4px;font-size:12.5px}
+.how .steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px}
+.step{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:26px;
+  transition:border-color .2s,transform .2s}
+.step:hover{border-color:var(--border-hi);transform:translateY(-2px)}
+.step .num{font-size:11px;font-weight:700;letter-spacing:.1em;color:var(--primary);text-transform:uppercase}
+.step h3{margin:10px 0 10px;font-size:19px;letter-spacing:-.02em;font-weight:800}
+.step p{margin:0;color:var(--dim);font-size:14.5px}
+.step code{background:var(--rail);padding:2px 6px;border-radius:5px;font-size:12.5px;
+  font-family:var(--font-mono);color:var(--fg)}
 
 /* --- Team --- */
-.team .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px}
-.member{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:22px}
-.member .avatar{width:52px;height:52px;border-radius:50%;background:var(--rail);display:flex;
-  align-items:center;justify-content:center;font-weight:700;font-size:20px;color:var(--dim);margin-bottom:14px}
-.member h3{margin:0 0 4px;font-size:16px}
-.member .role{font-size:12px;color:var(--dim);margin-bottom:10px;text-transform:uppercase;letter-spacing:.06em}
+.team .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px}
+.member{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px}
+.member .avatar{width:52px;height:52px;border-radius:50%;
+  background:linear-gradient(135deg,var(--primary),var(--primary-dark));display:flex;
+  align-items:center;justify-content:center;font-weight:800;font-size:20px;color:#fff;margin-bottom:16px}
+.member h3{margin:0 0 4px;font-size:17px;font-weight:800;letter-spacing:-.01em}
+.member .role{font-size:11px;color:var(--primary);margin-bottom:10px;text-transform:uppercase;
+  letter-spacing:.08em;font-weight:700}
 .member p{margin:0;color:var(--dim);font-size:13.5px;line-height:1.55}
-.edit-hint{color:var(--dim);font-size:11.5px;margin-top:14px;font-family:ui-monospace,Menlo,monospace}
+.edit-hint{color:var(--dim);font-size:11.5px;margin-top:16px;font-family:var(--font-mono)}
+.edit-hint code{color:var(--fg-soft)}
 
 /* --- Roadmap --- */
-.roadmap ol{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:14px}
-.roadmap li{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:20px 24px;
-  display:grid;grid-template-columns:110px 1fr;gap:20px;align-items:baseline}
-.roadmap .when{font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--pass);text-transform:uppercase}
-.roadmap .what{font-size:14.5px;color:var(--fg)}
-.roadmap .what b{color:var(--fg)}
+.roadmap ol{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:12px}
+.roadmap li{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px 24px;
+  display:grid;grid-template-columns:120px 1fr;gap:20px;align-items:baseline}
+.roadmap .when{font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--primary);text-transform:uppercase}
+.roadmap .what{font-size:15px;color:var(--fg-soft)}
+.roadmap .what b{color:var(--fg);font-weight:700}
 .roadmap .what .desc{color:var(--dim);font-size:13.5px;display:block;margin-top:4px}
+.roadmap .what code{background:var(--rail);padding:2px 6px;border-radius:5px;font-size:12px;
+  font-family:var(--font-mono);color:var(--fg)}
 
 /* --- CTA banner + Footer --- */
-.cta-banner{background:var(--card);border-top:1px solid var(--line);border-bottom:1px solid var(--line);
-  padding:60px 24px;text-align:center;margin-top:40px}
-.cta-banner h2{color:var(--fg);font-size:28px;letter-spacing:-.02em;text-transform:none;margin:0 0 12px;font-weight:600}
-.cta-banner p{color:var(--dim);margin:0 0 24px}
-footer{padding:30px 24px;text-align:center;color:var(--dim);font-size:12px}
-footer a{color:var(--dim)}
+.cta-banner{background:var(--surface);border-top:1px solid var(--border);
+  border-bottom:1px solid var(--border);padding:70px 24px;text-align:center;margin-top:40px}
+.cta-banner h2{color:var(--fg);font-size:32px;letter-spacing:-.02em;text-transform:none;margin:0 0 12px;
+  font-weight:700;font-family:var(--font-display)}
+.cta-banner p{color:var(--dim);margin:0 0 26px}
+footer{padding:34px 24px;text-align:center;color:var(--dim);font-size:12.5px}
+footer a{color:var(--fg-soft);text-decoration:none}
+footer a:hover{color:var(--primary-light)}
 </style>
 </head>
 <body>
 <nav class="navbar">
   <a href="/" class="brand">Tempered</a>
   <div class="links">
-    <a href="#how">How it works</a>
-    <a href="#team">Team</a>
-    <a href="#roadmap">Roadmap</a>
+    <a href="/#how">How it works</a>
+    <a href="/#team">Team</a>
+    <a href="/#roadmap">Roadmap</a>
     <a href="/demo" class="cta">Try demo</a>
   </div>
 </nav>
 
 <section class="hero">
+  <svg class="swoosh" viewBox="0 0 1200 520" preserveAspectRatio="none" aria-hidden="true">
+    <path d="M -80 110 C 340 30 760 300 1280 240" fill="none" stroke="var(--primary)"
+      stroke-width="72" stroke-linecap="round" vector-effect="non-scaling-stroke" opacity=".95"/>
+  </svg>
   <h1>Build any AI tool<br>from a sentence.</h1>
-  <p class="sub">Tempered turns a natural-language description into a working MCP server, lets you chat with an agent that uses it, and proves the tools don't quietly lie.</p>
+  <p class="sub">Describe a tool in plain English. Tempered writes the MCP server and gives you an agent that runs it, then checks the tools actually do what they say. Or try <b>8 ready-made connectors</b> right now.</p>
   <div class="cta-row">
-    <a href="/demo" class="btn primary">See the live demo →</a>
+    <a href="/demo" class="btn primary">Try 8 live APIs →</a>
     <a href="#how" class="btn ghost">How it works</a>
   </div>
-  <div class="tag-line"><code>$ tempered describe "a Slack poster that sends to a webhook"</code></div>
+  <div class="tag-line"><span class="prompt">$</span><code>tempered describe "a Slack poster that sends to a webhook"</code></div>
 </section>
 
 <section class="how" id="how">
@@ -106,17 +167,17 @@ footer a{color:var(--dim)}
     <div class="step">
       <div class="num">1 · Describe</div>
       <h3>Say what you want in English.</h3>
-      <p>Claude writes a complete FastMCP server — real HTTP calls, typed inputs, meaningful errors. No boilerplate, no OpenAPI spec required.</p>
+      <p>You describe the tool in plain English. Claude writes a complete MCP server for it, with real API calls, typed inputs, and clear errors. No spec to supply, no boilerplate to write.</p>
     </div>
     <div class="step">
       <div class="num">2 · Chat</div>
       <h3>Talk to your new agent.</h3>
-      <p>An in-browser chat panel loads the server's tools and hands them to Claude. Ask for something; it picks the right tool, calls the API, and answers.</p>
+      <p>Your browser loads the new server's tools and hands them to Claude. Ask for something, and Claude picks the right tool, calls the API, and answers.</p>
     </div>
     <div class="step">
       <div class="num">3 · Verify</div>
       <h3>Prove it doesn't lie.</h3>
-      <p>Tempered fires schema-directed adversarial payloads at every tool. Silent success — accepting bad input as if it worked — gets caught before the agent trusts it.</p>
+      <p>Tempered feeds every tool bad input on purpose and watches how it reacts. The risky case is silent success: a tool accepts junk and reports OK anyway. Tempered catches that before your agent trusts it.</p>
     </div>
   </div>
 </section>
@@ -128,22 +189,15 @@ footer a{color:var(--dim)}
       <div class="avatar">S</div>
       <h3>Siddhant Malik</h3>
       <div class="role">Founder</div>
-      <p>Building Tempered at the hackathon. Interested in the seam where LLMs meet real infrastructure — and everything that goes wrong there.</p>
+      <p>Building Tempered at the hackathon. He works on where LLMs meet real infrastructure, and everything that breaks in between.</p>
     </div>
     <div class="member">
-      <div class="avatar">?</div>
-      <h3>Your teammate</h3>
-      <div class="role">Role</div>
-      <p>Short bio. What they brought to the project.</p>
-    </div>
-    <div class="member">
-      <div class="avatar">?</div>
-      <h3>Your teammate</h3>
-      <div class="role">Role</div>
-      <p>Short bio. What they brought to the project.</p>
+      <div class="avatar">P</div>
+      <h3>Peter Ma</h3>
+      <div class="role">Design</div>
+      <p>Works on the website and product design: the look, the layout, and how the whole thing feels to use.</p>
     </div>
   </div>
-  <div class="edit-hint">Edit team members in <code>tempered/static/index.html</code></div>
 </section>
 
 <section class="roadmap" id="roadmap">
@@ -151,30 +205,30 @@ footer a{color:var(--dim)}
   <ol>
     <li>
       <div class="when">Near-term</div>
-      <div class="what"><b>More preset connectors and GitHub Actions integration.</b>
-        <span class="desc">A pre-verified catalogue of common APIs, plus <code>tempered test</code> as a CI gate so a regression in the API spec fails the PR.</span></div>
+      <div class="what"><b>More preset connectors, and GitHub Actions support.</b>
+        <span class="desc">A ready-made set of common APIs that work out of the box, plus <code>tempered test</code> as a CI check so a broken API spec fails the build.</span></div>
     </li>
     <li>
       <div class="when">Mid-term</div>
-      <div class="what"><b>Continuous conformance monitoring.</b>
-        <span class="desc">Watch every published MCP server for schema drift and silent-success regressions. Alert on the ones that stop rejecting what they should.</span></div>
+      <div class="what"><b>Monitoring that keeps running after launch.</b>
+        <span class="desc">Keep checking MCP servers once they ship, and flag any that quietly start accepting bad input again.</span></div>
     </li>
     <li>
       <div class="when">Mid-term</div>
       <div class="what"><b>A public "verified" badge for MCP servers.</b>
-        <span class="desc">Auditable pass rate any SaaS vendor can put next to their listing. Standards win by adoption, not by features.</span></div>
+        <span class="desc">A pass rate any vendor can show next to their listing, and that anyone can re-run to check for themselves.</span></div>
     </li>
     <li>
       <div class="when">Long-term</div>
-      <div class="what"><b>The conformance bar the ecosystem cites.</b>
-        <span class="desc">Registries and agent platforms adopt Tempered's suite as the ingestion gate. Broken servers stop reaching agents in the first place.</span></div>
+      <div class="what"><b>The check every server runs before it ships.</b>
+        <span class="desc">Registries and agent platforms run Tempered before they list a server, so the broken ones never reach agents at all.</span></div>
     </li>
   </ol>
 </section>
 
 <div class="cta-banner">
   <h2>See it in action.</h2>
-  <p>Two minutes. One sentence in, a working agent out.</p>
+  <p>Give it one sentence and you'll have a working agent in about two minutes.</p>
   <a href="/demo" class="btn primary">Open the demo →</a>
 </div>
 
