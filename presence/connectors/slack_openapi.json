@@ -1,0 +1,76 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Slack Presence",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://hooks.slack.com"
+    }
+  ],
+  "paths": {
+    "/services/{t1}/{t2}/{t3}": {
+      "post": {
+        "operationId": "post_update",
+        "summary": "Post a professional update to a Slack channel via an incoming webhook.",
+        "parameters": [
+          {
+            "name": "t1",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "t2",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "t3",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "text"
+                ],
+                "properties": {
+                  "text": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 3000,
+                    "description": "The message text."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Posted."
+          }
+        }
+      }
+    }
+  }
+}

@@ -48,6 +48,8 @@ BASE_URL = os.environ.get("API_BASE_URL", {base_url!r})
 headers = {{}}
 if token := os.environ.get("API_TOKEN"):
     headers["Authorization"] = f"Bearer {{token}}"
+if extra := os.environ.get("API_HEADERS"):  # e.g. Notion-Version
+    headers.update(json.loads(extra))
 
 mcp = FastMCP.from_openapi(
     openapi_spec=SPEC,

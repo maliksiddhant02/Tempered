@@ -97,12 +97,27 @@ async def check_write_safety() -> None:
     print("  write safety     POST skipped by default, scanned with --allow-writes")
 
 
+def check_presence() -> None:
+    """Credential parsing is a trust-boundary path — lock the regexes. No model call."""
+    import os
+
+    from presence import agent
+    os.environ["DISCORD_WEBHOOK_URL"] = "https://discord.com/api/webhooks/42/tok?wait=true"
+    assert agent._discord_secrets() == {"webhook_id": "42", "webhook_token": "tok"}
+    os.environ["SLACK_WEBHOOK_URL"] = "https://hooks.slack.com/services/T1/B2/xox3"
+    assert agent._slack_secrets() == {"t1": "T1", "t2": "B2", "t3": "xox3"}
+    assert agent._unknown(["discord", "nope"]) == ["nope"]
+    assert set(agent._anthropic_tool(agent.CONNECTORS["discord"])["input_schema"]["required"]) == {"content"}
+    print("  presence         webhook parsing + connector registry")
+
+
 def main() -> int:
     print("tempered self-check")
     check_synth()
     check_grading()
     asyncio.run(check_fixtures())
     asyncio.run(check_write_safety())
+    check_presence()
     print("ok")
     return 0
 

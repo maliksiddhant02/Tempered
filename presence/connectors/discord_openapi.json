@@ -1,0 +1,68 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Discord Presence",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://discord.com/api"
+    }
+  ],
+  "paths": {
+    "/webhooks/{webhook_id}/{webhook_token}": {
+      "post": {
+        "operationId": "post_update",
+        "summary": "Post a professional update to a Discord channel via an incoming webhook.",
+        "description": "Publishes a message. webhook_id and webhook_token come from the channel's webhook URL.",
+        "parameters": [
+          {
+            "name": "webhook_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "webhook_token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "content"
+                ],
+                "properties": {
+                  "content": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2000,
+                    "description": "The message text to post."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Message posted."
+          }
+        }
+      }
+    }
+  }
+}

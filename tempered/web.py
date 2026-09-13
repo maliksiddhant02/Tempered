@@ -10,6 +10,7 @@ Starlette + uvicorn + SSE all arrive with FastMCP, so this adds no dependencies.
 from __future__ import annotations
 
 import asyncio
+import os
 import sys
 from pathlib import Path
 from typing import Any, AsyncIterator
@@ -147,11 +148,82 @@ async def api_repair(request: Request) -> EventSourceResponse:
     return EventSourceResponse(_pump(run))
 
 
+# --- Presence agent: draft -> confirm -> publish on Tempered connectors --------
+
+# BYO keys the presence agent uses. Held in this process's environment only
+# (never written to disk, never returned to the browser) — fine for a localhost
+# dev tool, which is the only thing this server is meant to be.
+PRESENCE_KEYS = (
+    "ANTHROPIC_API_KEY", "DISCORD_WEBHOOK_URL", "SLACK_WEBHOOK_URL",
+    "NOTION_TOKEN", "NOTION_PAGE_ID", "GITHUB_TOKEN",
+)
+
+
+def _key_status() -> dict[str, bool]:
+    return {k: bool(os.environ.get(k, "").strip()) for k in PRESENCE_KEYS}
+
+
+async def api_presence_keys(request: Request) -> JSONResponse:
+    """GET reports which keys are set (booleans only). POST stores provided keys."""
+    if request.method == "POST":
+        body = await request.json()
+        for key in PRESENCE_KEYS:
+            value = (body.get(key) or "").strip()
+            if value:
+                os.environ[key] = value
+        return JSONResponse({"set": _key_status()})
+    return JSONResponse({"set": _key_status()})
+
+
+async def api_presence_plan(request: Request) -> JSONResponse:
+    """Draft tailored posts. Executes nothing — returns proposals to confirm."""
+    from presence.agent import plan
+
+    body = await request.json()
+    whats_new = (body.get("whats_new") or "").strip()
+    platforms = [str(p) for p in (body.get("platforms") or [])]
+    if not whats_new:
+        return JSONResponse({"error": "Tell me what's new first."}, status_code=400)
+    if not platforms:
+        return JSONResponse({"error": "Pick at least one platform."}, status_code=400)
+    try:
+        proposals, notes = await plan(whats_new, platforms)
+    except Exception as exc:  # noqa: BLE001 - surface the reason to the UI
+        return JSONResponse({"error": f"{type(exc).__name__}: {exc}"}, status_code=400)
+    return JSONResponse({
+        "notes": notes,
+        "proposals": [
+            {"platform": p.platform, "label": p.label, "content": p.content} for p in proposals
+        ],
+    })
+
+
+async def api_presence_publish(request: Request) -> JSONResponse:
+    """Publish only the (possibly edited) proposals the user approved."""
+    from presence.agent import Proposal, publish
+
+    body = await request.json()
+    proposals = [
+        Proposal(platform=i["platform"], content=i["content"])
+        for i in (body.get("proposals") or [])
+        if str(i.get("content", "")).strip()
+    ]
+    if not proposals:
+        return JSONResponse({"error": "Nothing to publish."}, status_code=400)
+    results = await publish(proposals)
+    return JSONResponse({"results": [
+        {"platform": r.platform, "label": r.label, "ok": r.ok, "detail": r.detail} for r in results
+    ]})
+
+
 app = Starlette(routes=[
     Route("/", index),
     Route("/api/scan", api_scan),
     Route("/api/generate", api_generate, methods=["POST"]),
     Route("/api/repair", api_repair),
+    Route("/api/presence/keys", api_presence_keys, methods=["GET", "POST"]),
+    Route("/api/presence/plan", api_presence_plan, methods=["POST"]),
+    Route("/api/presence/publish", api_presence_publish, methods=["POST"]),
 ])
 
 
