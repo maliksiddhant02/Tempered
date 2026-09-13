@@ -1,6 +1,6 @@
-# Anvil — Plan
+# Tempered — Plan
 
-*(working name: forge the tool, then test it on the anvil)*
+*(tempering: heat it, test it, harden it -- a tool is not finished until it has been proven)*
 
 ## What it is
 
@@ -49,7 +49,7 @@ differentiator.
   ours), and ship a **known-good control** the harness passes cleanly, proving it
   does not just flag everything.
 - **Usefulness (20%)** — CLI with an exit code, not a web app.
-  `npx anvil test ./server --fail-under B` returning nonzero is adoptable Monday.
+  `npx tempered test ./server --fail-under B` returning nonzero is adoptable Monday.
 - **Originality (15%)** — Name the defect class. "**Silent success**" is what a
   judge repeats in deliberation. Do not oversell the generator; anyone who knows
   FastMCP will discount it.

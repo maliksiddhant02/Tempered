@@ -1,4 +1,4 @@
-# Anvil — Architecture
+# Tempered — Architecture
 
 Scope note: this is a two-day hackathon build. The architecture is deliberately
 small. No database, no services, no queue. If a section of this document starts
@@ -63,7 +63,7 @@ repair    ---> patch, re-run FULL suite, max 2 attempts, else mark failed
 ### Module layout
 
 ```
-anvil/
+tempered/
   cli.py         entrypoint, exit codes
   generate.py    OpenAPI -> MCP server (thin wrapper over FastMCP)
   client.py      MCP protocol client: stdio + HTTP, handshake, timeouts
@@ -138,7 +138,7 @@ Report    = {server, grade, pass_rate, tools[], generated_at}
 ```
 
 Grade is a band over pass rate (A >= 95%, B >= 85%, C >= 70%, D >= 50%, else F).
-`anvil test ./server --fail-under B` exits nonzero below the threshold, which is
+`tempered test ./server --fail-under B` exits nonzero below the threshold, which is
 what makes it adoptable in CI.
 
 ### Repair contract

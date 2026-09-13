@@ -1,4 +1,4 @@
-# Anvil — Business Model
+# Tempered — Business Model
 
 Osterwalder nine-block canvas. Honest version: this is a developer tool in a
 young ecosystem, so the model is real but modest. Do not pitch it as a company
@@ -31,7 +31,7 @@ uncommoditized half is proof.
 
 ## 3. Channels
 
-- **CLI on npm/PyPI** -- primary. `npx anvil test ./server` with an exit code
+- **CLI on npm/PyPI** -- primary. `npx tempered test ./server` with an exit code
 - **GitHub Action** -- conformance as a CI gate on every PR
 - **Public findings** -- "we scanned N public MCP servers, X% return success on
   malformed input" is a distribution event, not just a result
@@ -74,7 +74,7 @@ a certainty -- say so if asked rather than inflating a TAM.
 
 ## 8. Key Partnerships
 
-- **FastMCP / generation tooling** -- dependency, not competitor. Anvil makes
+- **FastMCP / generation tooling** -- dependency, not competitor. Tempered makes
   their output trustworthy
 - **MCP registries** (official, Smithery, mcp.so) -- natural integration: show a
   conformance grade next to each listing
