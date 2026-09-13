@@ -128,6 +128,14 @@ CONNECTORS: dict[str, Connector] = {
         style="Formal changelog/announcement tone. Markdown is welcome in the body.",
         secrets=_github_secrets, env=_github_env,
     ),
+    "notion": Connector(
+        platform="notion", label="Notion",
+        server=str(ROOT / "connectors" / "notion_server.py"),
+        tool="append_note", fields=(Field("text", "Update", 2000),),
+        style="A short profile/'now' update, first person, plain and current.",
+        secrets=lambda: {"page_id": _need("NOTION_PAGE_ID")},
+        env=lambda: {"NOTION_TOKEN": _need("NOTION_TOKEN")},
+    ),
 }
 
 

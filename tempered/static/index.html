@@ -87,6 +87,8 @@ summary{cursor:pointer;font-size:12px;color:var(--dim)}
         <label>Slack webhook URL<input type="password" id="k_slack" placeholder="https://hooks.slack.com/services/…"></label>
         <label>GitHub token<input type="password" id="k_ghtoken" placeholder="ghp_…"></label>
         <label>GitHub repo (owner/name)<input type="text" id="k_ghrepo" placeholder="octocat/hello-world"></label>
+        <label>Notion token<input type="password" id="k_notion" placeholder="ntn_…"></label>
+        <label>Notion page ID<input type="text" id="k_notionpage" placeholder="page id to append to"></label>
       </div>
       <div class="row" style="margin-top:10px">
         <button id="saveKeys" class="ghost">Save keys</button>
@@ -101,6 +103,7 @@ summary{cursor:pointer;font-size:12px;color:var(--dim)}
       <label class="check"><input type="checkbox" class="plat" value="discord" checked> Discord</label>
       <label class="check"><input type="checkbox" class="plat" value="slack" checked> Slack</label>
       <label class="check"><input type="checkbox" class="plat" value="github"> GitHub</label>
+      <label class="check"><input type="checkbox" class="plat" value="notion"> Notion</label>
       <button id="draft">Draft</button>
     </div>
     <div class="msg" id="draftMsg"></div>
@@ -115,6 +118,7 @@ summary{cursor:pointer;font-size:12px;color:var(--dim)}
       <button class="ghost prove" data-platform="discord">Prove Discord</button>
       <button class="ghost prove" data-platform="slack">Prove Slack</button>
       <button class="ghost prove" data-platform="github">Prove GitHub</button>
+      <button class="ghost prove" data-platform="notion">Prove Notion</button>
     </div>
   </div>
 
@@ -335,10 +339,13 @@ $('saveKeys').onclick = async () => {
     SLACK_WEBHOOK_URL: $('k_slack').value.trim(),
     GITHUB_TOKEN: $('k_ghtoken').value.trim(),
     GITHUB_REPO: $('k_ghrepo').value.trim(),
+    NOTION_TOKEN: $('k_notion').value.trim(),
+    NOTION_PAGE_ID: $('k_notionpage').value.trim(),
   };
   try {
     await postJSON('/api/presence/keys', body);
-    ['k_anthropic', 'k_discord', 'k_slack', 'k_ghtoken', 'k_ghrepo'].forEach(id => $(id).value = '');
+    ['k_anthropic', 'k_discord', 'k_slack', 'k_ghtoken', 'k_ghrepo', 'k_notion', 'k_notionpage']
+      .forEach(id => $(id).value = '');
     await loadKeys();
   } catch (e) { $('keyStatus').textContent = String(e.message || e); }
 };
