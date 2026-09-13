@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: tempered
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m tempered.cli serve
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12"
+      - key: ANTHROPIC_API_KEY
+        sync: false        # set in the Render dashboard, not in git
+      - key: SLACK_WEBHOOK_URL
+        sync: false
+      - key: GITHUB_TOKEN
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: DISCORD_WEBHOOK_URL
+        sync: false
+      - key: UNSPLASH_ACCESS_KEY
+        sync: false
+      - key: NASA_API_KEY
+        sync: false

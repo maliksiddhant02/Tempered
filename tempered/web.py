@@ -437,11 +437,22 @@ app = Starlette(routes=[
 
 
 def serve(port: int = 8000) -> None:
+    """Run the local UI. In production (Render/etc.) PORT env var overrides,
+    and we bind to 0.0.0.0 so the platform can route to us. Local dev stays on
+    127.0.0.1 so a laptop demo can't accidentally listen on a public interface."""
     import uvicorn
 
     _load_dotenv()
     loaded = [k for k in CHAT_KEYS if os.environ.get(k)]
-    print(f"  tempered ui  ->  http://127.0.0.1:{port}")
+
+    env_port = os.environ.get("PORT")
+    if env_port:
+        port = int(env_port)
+        host = "0.0.0.0"  # noqa: S104 - platform-managed, required by Render/Fly
+    else:
+        host = "127.0.0.1"
+
+    print(f"  tempered ui  ->  http://{host}:{port}")
     if loaded:
         print(f"  keys from env: {', '.join(loaded)}")
-    uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning")
+    uvicorn.run(app, host=host, port=port, log_level="warning")
