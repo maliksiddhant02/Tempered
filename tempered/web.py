@@ -203,6 +203,62 @@ async def api_presence_plan(request: Request) -> JSONResponse:
     return JSONResponse({"notes": notes, "proposals": [serialize(p) for p in proposals]})
 
 
+_sink_url: str | None = None
+
+
+def _sink() -> str:
+    """A local catch-all that 200s any request. Proving a connector fires
+    adversarial payloads at IT, never the real API — so writes are safe."""
+    global _sink_url
+    if _sink_url:
+        return _sink_url
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    class Handler(BaseHTTPRequestHandler):
+        def _ok(self) -> None:
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", "2")
+            self.end_headers()
+            self.wfile.write(b"{}")
+        do_GET = do_POST = do_PUT = do_PATCH = do_DELETE = _ok  # type: ignore[assignment]
+
+        def log_message(self, *a: Any) -> None:
+            pass
+
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    _sink_url = f"http://127.0.0.1:{srv.server_address[1]}"
+    return _sink_url
+
+
+async def api_presence_prove(request: Request) -> Any:
+    """SSE: run the conformance scan on a connector, pointed at the safe sink.
+
+    This is the 'Tempered proves it' beat — the same adversarial suite that grades
+    any MCP server, run against the connectors the agent will actually use.
+    """
+    from presence.agent import CONNECTORS
+
+    from .generate import load_methods
+
+    platform = request.query_params.get("platform", "").strip()
+    connector = CONNECTORS.get(platform)
+    if not connector:
+        return JSONResponse({"error": f"no connector for {platform!r}"}, status_code=400)
+
+    server_path = connector.server
+    methods = load_methods(Path(server_path))
+    env = {**os.environ, "API_BASE_URL": _sink()}  # adversarial writes hit the sink, not the API
+
+    async def run(emit: Any) -> None:
+        await scan(sys.executable, [server_path], f"{connector.label} connector",
+                   methods=methods, allow_writes=True, on_event=emit, env=env)
+
+    return EventSourceResponse(_pump(run))
+
+
 async def api_presence_publish(request: Request) -> JSONResponse:
     """Publish only the (possibly edited) proposals the user approved."""
     from presence.agent import Proposal, publish
@@ -229,6 +285,7 @@ app = Starlette(routes=[
     Route("/api/presence/keys", api_presence_keys, methods=["GET", "POST"]),
     Route("/api/presence/plan", api_presence_plan, methods=["POST"]),
     Route("/api/presence/publish", api_presence_publish, methods=["POST"]),
+    Route("/api/presence/prove", api_presence_prove),
 ])
 
 

@@ -110,6 +110,12 @@ summary{cursor:pointer;font-size:12px;color:var(--dim)}
       <span class="note">Nothing is sent until you click this.</span>
     </div>
     <div id="pubResults"></div>
+    <div class="row" style="margin-top:16px;align-items:center">
+      <span class="note">Trust them? Tempered proves each rejects bad input:</span>
+      <button class="ghost prove" data-platform="discord">Prove Discord</button>
+      <button class="ghost prove" data-platform="slack">Prove Slack</button>
+      <button class="ghost prove" data-platform="github">Prove GitHub</button>
+    </div>
   </div>
 
   <p class="tag" style="margin:34px 0 14px;border-top:1px solid var(--line);padding-top:24px">
@@ -387,6 +393,11 @@ $('publish').onclick = async () => {
   } catch (e) { $('pubResults').innerHTML = `<div class="msg err">${esc(String(e.message || e))}</div>`; }
   finally { $('publish').disabled = false; }
 };
+document.querySelectorAll('.prove').forEach(b => b.onclick = () => {
+  reset();
+  open('/api/presence/prove?platform=' + encodeURIComponent(b.dataset.platform));
+  $('results').scrollIntoView({behavior: 'smooth', block: 'nearest'});
+});
 loadKeys();
 </script>
 </body>

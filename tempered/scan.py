@@ -222,13 +222,16 @@ async def scan(
     methods: dict[str, str] | None = None,
     allow_writes: bool = False,
     on_event: Listener = None,
+    env: dict[str, str] | None = None,
 ) -> Report:
     """Spawn a server and scan every tool it exposes.
 
     Adversarial payloads are never sent to a tool known to mutate state unless
     `allow_writes` says so. `methods` is the tool -> HTTP method manifest written
     beside a generated server; without it every tool is scanned, because a
-    hand-written server gives us nothing to be careful with.
+    hand-written server gives us nothing to be careful with. `env` is the child
+    process environment — used to point a connector at a safe sink so adversarial
+    writes never reach the real API.
     """
     from .generate import READ_ONLY_METHODS
 
@@ -236,7 +239,7 @@ async def scan(
     methods = methods or {}
     report = Report(server=label)
 
-    async with client.connect(command, args) as server:
+    async with client.connect(command, args, env=env) as server:
         tools = await server.tools()
         emit({"type": "start", "server": label, "tools": [t.name for t in tools]})
 
