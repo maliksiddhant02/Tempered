@@ -77,5 +77,5 @@ in (GraphQL and closed apps are draft-only), no OAuth.
 
 ## Team
 
-- ta.aus.software@gmail.com
+- peter.ma3@hotmail.com
 <!-- add the rest of the team here and in the submission form -->
