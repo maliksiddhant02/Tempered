@@ -6,9 +6,11 @@
 <title>Tempered</title>
 <style>
 :root{color-scheme:light dark;--bg:#fbfaf9;--fg:#1a1a1a;--dim:#6b6b6b;--line:#e4e1dd;
-  --card:#fff;--pass:#2f7d4f;--fail:#c0392b;--amb:#9a7b28;--accent:#1a1a1a;--rail:#f2f0ee}
+  --card:#fff;--pass:#2f7d4f;--fail:#c0392b;--amb:#9a7b28;--accent:#1a1a1a;--rail:#f2f0ee;
+  --user:#eef3ef;--assistant:#fff;--tool:#f5efe1}
 @media(prefers-color-scheme:dark){:root{--bg:#16161a;--fg:#e8e6e3;--dim:#9a9a9a;--line:#2c2c33;
-  --card:#1d1d22;--pass:#57b87f;--fail:#e57366;--amb:#d4ac52;--accent:#e8e6e3;--rail:#202027}}
+  --card:#1d1d22;--pass:#57b87f;--fail:#e57366;--amb:#d4ac52;--accent:#e8e6e3;--rail:#202027;
+  --user:#1e2a24;--assistant:#1d1d22;--tool:#2a241a}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--fg);
   font:15px/1.55 ui-sans-serif,system-ui,-apple-system,sans-serif}
@@ -17,405 +19,419 @@ h1{font-size:26px;margin:0;letter-spacing:-.02em}
 .tag{color:var(--dim);font-size:13px;margin:4px 0 28px}
 .panel{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px 20px;margin-bottom:18px}
 .panel h2{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);margin:0 0 12px;font-weight:600}
-.row{display:flex;gap:10px;flex-wrap:wrap}
-input[type=text]{flex:1;min-width:260px;padding:9px 12px;border:1px solid var(--line);border-radius:7px;
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+input[type=text],select{flex:1;min-width:220px;padding:9px 12px;border:1px solid var(--line);border-radius:7px;
   background:var(--bg);color:var(--fg);font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
-input[type=text]:focus{outline:2px solid var(--accent);outline-offset:-1px}
+input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:-1px}
 button{padding:9px 16px;border:1px solid var(--accent);border-radius:7px;background:var(--accent);
   color:var(--bg);font-size:13px;font-weight:600;cursor:pointer}
 button.ghost{background:transparent;color:var(--fg);border-color:var(--line)}
 button:disabled{opacity:.4;cursor:not-allowed}
 label.check{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--dim)}
-.hero{display:none;align-items:center;gap:20px;margin-bottom:18px}
-.hero.on{display:flex}
-.grade{font-size:52px;font-weight:600;line-height:1;min-width:64px;text-align:center}
-.grade.A,.grade.B{color:var(--pass)}.grade.C{color:var(--amb)}
-.grade.D,.grade.F{color:var(--fail)}.grade\?{color:var(--dim)}
-.stats{font-size:13px;color:var(--dim)}.stats b{color:var(--fg)}
-.progress{height:4px;background:var(--rail);border-radius:2px;overflow:hidden;margin-top:10px}
-.progress span{display:block;height:100%;width:0;background:var(--pass);transition:width .2s}
-.tool{border-top:1px solid var(--line);padding:12px 0}
-.tool:first-child{border-top:0}
-.tool h3{margin:0;font:13px ui-monospace,SFMono-Regular,Menlo,monospace;display:flex;gap:10px;align-items:center}
+.msg{font-size:13px;color:var(--dim);padding:6px 0}
+.msg.err{color:var(--fail)}
+.msg.ok{color:var(--pass)}
+textarea{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:7px;background:var(--bg);
+  color:var(--fg);font:14px/1.5 ui-sans-serif,system-ui,sans-serif;resize:vertical}
+summary{cursor:pointer;font-size:12px;color:var(--dim)}
+.keys{display:grid;gap:10px;margin-top:12px}
+.keys label{display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--dim)}
+.keys input{padding:8px 11px;border:1px solid var(--line);border-radius:7px;background:var(--bg);
+  color:var(--fg);font:12px ui-monospace,Menlo,monospace}
+.hide{display:none}
 .pill{font-size:10px;letter-spacing:.05em;font-weight:700;padding:2px 7px;border-radius:99px;text-transform:uppercase}
 .pill.pass{background:color-mix(in srgb,var(--pass) 16%,transparent);color:var(--pass)}
 .pill.fail{background:color-mix(in srgb,var(--fail) 16%,transparent);color:var(--fail)}
 .pill.skip,.pill.inc{background:color-mix(in srgb,var(--amb) 16%,transparent);color:var(--amb)}
-.note{font-size:12px;color:var(--dim);margin-top:5px}
+
+/* --- Chat --------------------------------------------------------------- */
+#messages{display:flex;flex-direction:column;gap:10px;max-height:520px;overflow-y:auto;padding:4px}
+.bubble{padding:10px 14px;border-radius:10px;border:1px solid var(--line);max-width:88%;
+  font-size:14px;line-height:1.5;white-space:pre-wrap;word-wrap:break-word}
+.bubble.user{background:var(--user);align-self:flex-end}
+.bubble.assistant{background:var(--assistant)}
+.bubble.tool{background:var(--tool);font:11.5px ui-monospace,SFMono-Regular,Menlo,monospace;
+  align-self:stretch;max-width:100%}
+.bubble.tool .head{font-weight:700;font-size:10px;letter-spacing:.05em;color:var(--dim);
+  text-transform:uppercase;margin-bottom:4px;display:flex;gap:8px;align-items:center}
+.bubble.tool.err{border-color:var(--fail);color:var(--fail)}
+.bubble.tool code{white-space:pre-wrap;word-break:break-all;display:block;color:var(--fg)}
+.chat-input{display:flex;gap:10px;margin-top:12px}
+.chat-input textarea{flex:1;min-height:60px;font:14px ui-sans-serif,system-ui,sans-serif}
+.tools-loaded{font-size:11px;color:var(--dim);padding:4px 0}
+.tools-loaded code{font-family:ui-monospace,Menlo,monospace}
+
+/* --- Verify (scan/repair) — collapsed by default ------------------------ */
+.verify summary{padding:10px 0}
+.grade{font-size:38px;font-weight:600;line-height:1;min-width:52px;text-align:center;padding:0 12px}
+.grade.A,.grade.B{color:var(--pass)}.grade.C{color:var(--amb)}
+.grade.D,.grade.F{color:var(--fail)}.grade\?{color:var(--dim)}
+.hero{display:none;align-items:center;gap:20px;padding:14px 0}
+.hero.on{display:flex}
+.stats{font-size:13px;color:var(--dim)}.stats b{color:var(--fg)}
+.progress{height:4px;background:var(--rail);border-radius:2px;overflow:hidden;margin-top:10px}
+.progress span{display:block;height:100%;width:0;background:var(--pass);transition:width .2s}
+.tool-scan{border-top:1px solid var(--line);padding:12px 0}
+.tool-scan h3{margin:0;font:13px ui-monospace,Menlo,monospace;display:flex;gap:10px;align-items:center}
 .find{display:grid;grid-template-columns:120px 1fr;gap:8px;font-size:12px;padding:6px 0 6px 10px;
   border-left:2px solid transparent;margin-top:6px}
 .find.silent_success,.find.crash{border-left-color:var(--fail);background:color-mix(in srgb,var(--fail) 5%,transparent)}
 .find.ambiguous{border-left-color:var(--amb)}
 .v{font-weight:700;font-size:10px;letter-spacing:.05em}
 .v.silent_success,.v.crash{color:var(--fail)}.v.ambiguous{color:var(--amb)}.v.pass{color:var(--pass)}
-code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;word-break:break-all}
-.io{color:var(--dim);margin-top:3px}
-.io b{color:var(--fg);font-weight:600}
+code.mono{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;word-break:break-all}
 pre.diff{background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:12px;
   overflow-x:auto;font-size:11.5px;line-height:1.45;margin:10px 0 0}
 pre.diff .add{color:var(--pass)}pre.diff .del{color:var(--fail)}
-.msg{font-size:13px;color:var(--dim);padding:6px 0}
-.msg.err{color:var(--fail)}
-textarea{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:7px;background:var(--bg);
-  color:var(--fg);font:14px/1.5 ui-sans-serif,system-ui,sans-serif;resize:vertical}
-textarea:focus,input[type=password]:focus{outline:2px solid var(--accent);outline-offset:-1px}
-summary{cursor:pointer;font-size:12px;color:var(--dim)}
-.keys{display:grid;gap:10px;margin-top:12px}
-.keys label{display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--dim)}
-.keys input{padding:8px 11px;border:1px solid var(--line);border-radius:7px;background:var(--bg);
-  color:var(--fg);font:12px ui-monospace,Menlo,monospace}
-.draft{border:1px solid var(--line);border-radius:8px;padding:12px;margin-top:12px}
-.draft .head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
-.plat-name{font-size:12px;font-weight:600}
-.count{font-size:11px;color:var(--dim)}.count.over{color:var(--fail)}
-.res{display:flex;gap:8px;align-items:center;font-size:13px;padding:6px 0}
-.hide{display:none}
 </style>
 </head>
 <body>
 <main>
   <h1>Tempered</h1>
-  <p class="tag">A presence agent that drafts and publishes your updates — over connectors it proves before it trusts them.</p>
+  <p class="tag">Describe an API. Tempered generates an MCP server for it, then you chat with a Claude-powered agent that uses it.</p>
 
   <div class="panel">
-    <h2>Presence agent</h2>
-    <details id="keys">
-      <summary>Connections &amp; keys (stored in memory, localhost only)</summary>
+    <h2>Keys</h2>
+    <details id="keysDetails">
+      <summary id="keySummary">no keys set</summary>
       <div class="keys">
-        <label>Anthropic API key<input type="password" id="k_anthropic" placeholder="sk-ant-…"></label>
-        <label>Discord webhook URL<input type="password" id="k_discord" placeholder="https://discord.com/api/webhooks/…"></label>
-        <label>Slack webhook URL<input type="password" id="k_slack" placeholder="https://hooks.slack.com/services/…"></label>
-        <label>GitHub token<input type="password" id="k_ghtoken" placeholder="ghp_…"></label>
-        <label>GitHub repo (owner/name)<input type="text" id="k_ghrepo" placeholder="octocat/hello-world"></label>
-        <label>Notion token<input type="password" id="k_notion" placeholder="ntn_…"></label>
-        <label>Notion page ID<input type="text" id="k_notionpage" placeholder="page id to append to"></label>
+        <label>Anthropic API key (required for chat &amp; repair)
+          <input type="password" id="k_anthropic" placeholder="sk-ant-…"></label>
+        <label>API bearer token (optional — passed to the generated server as API_TOKEN)
+          <input type="password" id="k_token" placeholder="ghp_… / stripe test key / etc."></label>
       </div>
       <div class="row" style="margin-top:10px">
         <button id="saveKeys" class="ghost">Save keys</button>
-        <span class="note" id="keyStatus"></span>
+        <span class="msg" id="keyMsg"></span>
       </div>
     </details>
-
-    <div style="margin-top:14px">
-      <textarea id="whats" rows="4" placeholder="What's new? e.g. I just shipped Tempered, an open-source tool that generates MCP servers and proves they reject bad input."></textarea>
-    </div>
-    <div class="row" style="margin-top:10px;align-items:center">
-      <label class="check"><input type="checkbox" class="plat" value="discord" checked> Discord</label>
-      <label class="check"><input type="checkbox" class="plat" value="slack" checked> Slack</label>
-      <label class="check"><input type="checkbox" class="plat" value="github"> GitHub</label>
-      <label class="check"><input type="checkbox" class="plat" value="notion"> Notion</label>
-      <button id="draft">Draft</button>
-    </div>
-    <div class="msg" id="draftMsg"></div>
-    <div id="drafts"></div>
-    <div class="row hide" id="publishRow" style="margin-top:6px">
-      <button id="publish">Publish approved</button>
-      <span class="note">Nothing is sent until you click this.</span>
-    </div>
-    <div id="pubResults"></div>
-    <div class="row" style="margin-top:16px;align-items:center">
-      <span class="note">Trust them? Tempered proves each rejects bad input:</span>
-      <button class="ghost prove" data-platform="discord">Prove Discord</button>
-      <button class="ghost prove" data-platform="slack">Prove Slack</button>
-      <button class="ghost prove" data-platform="github">Prove GitHub</button>
-      <button class="ghost prove" data-platform="notion">Prove Notion</button>
-    </div>
-    <div class="row" style="margin-top:8px;align-items:center">
-      <span class="note">Scored F? Harden it — Tempered rewrites it to enforce its schema, then re-proves:</span>
-      <button class="ghost harden" data-platform="discord">Harden Discord</button>
-      <button class="ghost harden" data-platform="slack">Harden Slack</button>
-      <button class="ghost harden" data-platform="github">Harden GitHub</button>
-    </div>
   </div>
 
-  <p class="tag" style="margin:34px 0 14px;border-top:1px solid var(--line);padding-top:24px">
-    <b style="color:var(--fg)">The engine.</b> Each connector above is generated from an API spec and proven here — before the agent is allowed to use it.</p>
-
   <div class="panel">
-    <h2>Generate from an OpenAPI spec</h2>
+    <h2>1 &nbsp;Generate an MCP server from an OpenAPI spec</h2>
     <div class="row">
+      <select id="preset">
+        <option value="">— pick a preset —</option>
+      </select>
+      <span class="msg">or paste any OpenAPI URL:</span>
+    </div>
+    <div class="row" style="margin-top:10px">
       <input type="text" id="spec" placeholder="https://petstore3.swagger.io/api/v3/openapi.json">
       <button id="gen">Generate</button>
     </div>
     <div class="msg" id="genMsg"></div>
+    <div class="msg" id="presetHint"></div>
   </div>
 
-  <div class="panel">
-    <h2>2 &nbsp;Scan for conformance</h2>
-    <div class="row">
-      <input type="text" id="source" placeholder="fixtures/broken_server.py">
+  <div class="panel hide" id="chatPanel">
+    <h2>2 &nbsp;Chat with your agent</h2>
+    <div class="tools-loaded" id="toolsLoaded"></div>
+    <div id="messages"></div>
+    <div class="chat-input">
+      <textarea id="chatInput" placeholder="Ask the agent to do something…"></textarea>
+      <button id="chatSend">Send</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button id="chatReset" class="ghost">New conversation</button>
+      <span class="msg" id="chatMsg"></span>
+    </div>
+  </div>
+
+  <details class="panel verify hide" id="verifyPanel">
+    <summary><b style="color:var(--fg)">3 &nbsp;Verify it works</b> — run Tempered's adversarial suite against the server before trusting it</summary>
+    <div class="row" style="margin-top:12px">
       <button id="scan">Scan</button>
       <button id="repair" class="ghost">Repair</button>
-    </div>
-    <div class="row" style="margin-top:10px">
-      <label class="check"><input type="checkbox" id="writes"> also scan write tools (POST/PUT/DELETE)</label>
+      <label class="check"><input type="checkbox" id="writes"> also scan write tools</label>
     </div>
     <div class="msg" id="scanMsg"></div>
-  </div>
-
-  <div class="hero panel" id="hero">
-    <div class="grade" id="grade">·</div>
-    <div style="flex:1">
-      <div class="stats" id="stats"></div>
-      <div class="progress"><span id="bar"></span></div>
+    <div class="hero" id="hero">
+      <div class="grade" id="grade">·</div>
+      <div style="flex:1">
+        <div class="stats" id="stats"></div>
+        <div class="progress"><span id="bar"></span></div>
+      </div>
     </div>
-  </div>
-
-  <div class="panel hide" id="results"></div>
-  <div class="panel hide" id="repairOut"><h2>Repair</h2><div id="repairBody"></div></div>
+    <div id="scanResults"></div>
+    <div id="repairOut" class="hide"><h2 style="margin-top:14px">Repair</h2><div id="repairBody"></div></div>
+  </details>
 </main>
 
 <script>
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
-let stream = null, tools = {}, seen = 0, expected = 0;
+let currentServer = null;      // path to the generated MCP server .py
+let chatHistory = [];          // Anthropic-shape messages array
+let chatStream = null;
 
-function reset() {
-  if (stream) { stream.close(); stream = null; }
-  tools = {}; seen = 0; expected = 0;
-  $('results').innerHTML = ''; $('results').classList.add('hide');
-  $('repairOut').classList.add('hide'); $('repairBody').innerHTML = '';
-  $('hero').classList.remove('on'); $('bar').style.width = '0';
-  $('scanMsg').textContent = ''; $('scanMsg').className = 'msg';
-}
-
-function toolBlock(name) {
-  if (tools[name]) return tools[name];
-  const el = document.createElement('div');
-  el.className = 'tool';
-  el.innerHTML = `<h3>${esc(name)} <span class="pill pass" data-pill>running</span></h3><div data-body></div>`;
-  $('results').appendChild(el);
-  $('results').classList.remove('hide');
-  tools[name] = el;
-  return el;
-}
-
-function onEvent(ev) {
-  const d = JSON.parse(ev.data);
-  if (d.type === 'start') {
-    $('hero').classList.add('on');
-    $('grade').textContent = '·'; $('grade').className = 'grade';
-    $('stats').innerHTML = `scanning <b>${d.tools.length}</b> tools…`;
-  }
-  else if (d.type === 'tool_start') { expected += d.checks; toolBlock(d.tool); }
-  else if (d.type === 'tool_skipped') {
-    const el = toolBlock(d.tool);
-    el.querySelector('[data-pill]').className = 'pill skip';
-    el.querySelector('[data-pill]').textContent = 'skipped';
-    el.querySelector('[data-body]').innerHTML = `<div class="note">${esc(d.reason)}</div>`;
-  }
-  else if (d.type === 'tool_inconclusive') {
-    const el = toolBlock(d.tool);
-    el.querySelector('[data-pill]').className = 'pill inc';
-    el.querySelector('[data-pill]').textContent = 'inconclusive';
-    el.querySelector('[data-body]').innerHTML = `<div class="note">${esc(d.note)}</div>`;
-  }
-  else if (d.type === 'finding') {
-    seen++;
-    if (expected) $('bar').style.width = Math.min(100, seen / expected * 100) + '%';
-    if (d.verdict === 'pass') return;              // only failures earn a row
-    const body = toolBlock(d.tool).querySelector('[data-body]');
-    const row = document.createElement('div');
-    row.className = 'find ' + d.verdict;
-    row.innerHTML =
-      `<div class="v ${d.verdict}">${esc(d.verdict.replace('_', ' ').toUpperCase())}</div>
-       <div><code>${esc(d.field)}</code> — ${esc(d.detail)}
-         <div class="io"><b>sent</b> <code>${esc(JSON.stringify(d.payload))}</code></div>
-         <div class="io"><b>got</b> <code>${esc(String(d.response).slice(0, 160))}</code></div>
-       </div>`;
-    body.appendChild(row);
-  }
-  else if (d.type === 'tool_done') {
-    const el = tools[d.tool]; if (!el) return;
-    const pill = el.querySelector('[data-pill]');
-    const failed = el.querySelectorAll('.find.silent_success, .find.crash').length;
-    pill.className = 'pill ' + (failed ? 'fail' : 'pass');
-    pill.textContent = failed ? `${failed} failing` : 'clean';
-  }
-  else if (d.type === 'done') {
-    $('grade').textContent = d.grade;
-    $('grade').className = 'grade ' + d.grade;
-    $('bar').style.width = '100%';
-    $('stats').innerHTML =
-      `<b>${Math.round(d.pass_rate * 100)}%</b> pass rate · <b>${d.total_checks}</b> adversarial checks · ` +
-      (d.failures ? `<b>${d.failures}</b> failing` : 'no failures') +
-      (d.inconclusive ? ` · ${d.inconclusive} inconclusive` : '') +
-      (d.skipped ? ` · ${d.skipped} skipped` : '');
-    finish();
-  }
-  else if (d.type === 'repair_start') {
-    $('repairOut').classList.remove('hide');
-    $('repairBody').innerHTML = '<div class="msg">scanning, then patching…</div>';
-  }
-  else if (d.type === 'attempt') {
-    const diff = esc(d.diff).split('\n').map(l =>
-      l.startsWith('+') ? `<span class="add">${l}</span>` :
-      l.startsWith('-') ? `<span class="del">${l}</span>` : l).join('\n');
-    $('repairBody').insertAdjacentHTML('beforeend',
-      `<div class="tool"><h3>attempt ${d.number}
-         <span class="pill ${d.kept ? 'pass' : 'skip'}">${d.kept ? 'kept' : 'rejected'}</span>
-         <span class="note">→ ${esc(d.grade)} ${Math.round(d.pass_rate * 100)}%</span></h3>
-         <pre class="diff">${diff}</pre></div>`);
-  }
-  else if (d.type === 'repair_done') {
-    $('repairBody').insertAdjacentHTML('beforeend',
-      `<div class="msg"><b>${esc(d.before.grade)} ${Math.round(d.before.pass_rate * 100)}%</b>
-       → <b>${esc(d.after.grade)} ${Math.round(d.after.pass_rate * 100)}%</b>
-       ${d.fixed ? '· all checks passing' : '· some checks still failing, left failed'}</div>`);
-    finish();
-  }
-  else if (d.type === 'error') { fail(d.message); }
-}
-
-function finish() {
-  if (stream) { stream.close(); stream = null; }
-  $('scan').disabled = false; $('repair').disabled = false; $('gen').disabled = false;
-}
-function fail(message) {
-  $('scanMsg').textContent = message;
-  $('scanMsg').className = 'msg err';
-  finish();
-}
-
-function open(url) {
-  $('scan').disabled = true; $('repair').disabled = true; $('gen').disabled = true;
-  stream = new EventSource(url);
-  stream.onmessage = onEvent;
-  stream.onerror = () => { if (stream) fail('connection to the scanner dropped'); };
-}
-
-$('scan').onclick = () => {
-  const source = $('source').value.trim();
-  if (!source) return fail('give me a path to a server');
-  reset();
-  open(`/api/scan?source=${encodeURIComponent(source)}&allow_writes=${$('writes').checked ? 1 : 0}`);
-};
-
-$('repair').onclick = () => {
-  const source = $('source').value.trim();
-  if (!source) return fail('give me a path to a server');
-  reset();
-  open(`/api/repair?source=${encodeURIComponent(source)}`);
-};
-
-$('gen').onclick = async () => {
-  const spec = $('spec').value.trim();
-  if (!spec) return;
-  $('gen').disabled = true;
-  $('genMsg').className = 'msg';
-  $('genMsg').textContent = 'fetching spec and generating…';
-  try {
-    const r = await fetch('/api/generate', {
-      method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({spec})
-    });
-    const d = await r.json();
-    if (!r.ok) throw new Error(d.error || 'generate failed');
-    $('genMsg').textContent = `wrote ${d.server} — ${d.tools} tools (${d.writes} write tools, skipped unless you opt in)`;
-    $('source').value = d.server.replace(/\\/g, '/');
-  } catch (e) {
-    $('genMsg').className = 'msg err';
-    $('genMsg').textContent = String(e.message || e);
-  } finally {
-    $('gen').disabled = false;
-  }
-};
-
-$('source').value = 'fixtures/broken_server.py';
-
-// --- Presence agent -------------------------------------------------------
-async function postJSON(url, body) {
-  const r = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify(body)});
-  const d = await r.json();
-  if (!r.ok) throw new Error(d.error || 'request failed');
-  return d;
-}
+// --- Keys -----------------------------------------------------------------
 async function loadKeys() {
   try {
-    const d = await (await fetch('/api/presence/keys')).json();
+    const d = await (await fetch('/api/keys')).json();
     const set = d.set || {}, n = Object.values(set).filter(Boolean).length;
-    $('keyStatus').textContent = n ? `${n} key${n > 1 ? 's' : ''} set` : 'no keys set yet';
+    $('keySummary').textContent = n
+      ? `${n} key${n > 1 ? 's' : ''} set (${Object.keys(set).filter(k => set[k]).join(', ')})`
+      : 'no keys set — click to add';
   } catch (e) { /* leave blank */ }
 }
 $('saveKeys').onclick = async () => {
   const body = {
     ANTHROPIC_API_KEY: $('k_anthropic').value.trim(),
-    DISCORD_WEBHOOK_URL: $('k_discord').value.trim(),
-    SLACK_WEBHOOK_URL: $('k_slack').value.trim(),
-    GITHUB_TOKEN: $('k_ghtoken').value.trim(),
-    GITHUB_REPO: $('k_ghrepo').value.trim(),
-    NOTION_TOKEN: $('k_notion').value.trim(),
-    NOTION_PAGE_ID: $('k_notionpage').value.trim(),
+    API_TOKEN: $('k_token').value.trim(),
   };
   try {
-    await postJSON('/api/presence/keys', body);
-    ['k_anthropic', 'k_discord', 'k_slack', 'k_ghtoken', 'k_ghrepo', 'k_notion', 'k_notionpage']
-      .forEach(id => $(id).value = '');
+    await fetch('/api/keys', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body)});
+    ['k_anthropic','k_token'].forEach(id => $(id).value = '');
+    $('keyMsg').textContent = 'saved'; $('keyMsg').className = 'msg ok';
     await loadKeys();
-  } catch (e) { $('keyStatus').textContent = String(e.message || e); }
+  } catch (e) { $('keyMsg').textContent = String(e.message||e); $('keyMsg').className='msg err'; }
 };
-const platforms = () => [...document.querySelectorAll('.plat:checked')].map(c => c.value);
-$('draft').onclick = async () => {
-  const whats = $('whats').value.trim(), plats = platforms();
-  if (!whats) return void ($('draftMsg').className = 'msg err', $('draftMsg').textContent = "Tell me what's new first.");
-  if (!plats.length) return void ($('draftMsg').className = 'msg err', $('draftMsg').textContent = 'Pick a platform.');
-  $('draft').disabled = true;
-  $('draftMsg').className = 'msg'; $('draftMsg').textContent = 'drafting…';
-  $('drafts').innerHTML = ''; $('pubResults').innerHTML = ''; $('publishRow').classList.add('hide');
+
+// --- Presets --------------------------------------------------------------
+async function loadPresets() {
   try {
-    const d = await postJSON('/api/presence/plan', {whats_new: whats, platforms: plats});
-    $('draftMsg').textContent = d.notes || '';
-    if (!d.proposals.length) { $('draftMsg').textContent = 'no drafts produced'; return; }
-    d.proposals.forEach(p => {
-      const el = document.createElement('div');
-      el.className = 'draft'; el.dataset.platform = p.platform;
-      el.innerHTML = `<div class="head"><span class="plat-name">${esc(p.label)}</span></div>`;
-      p.fields.forEach(f => {
-        const wrap = document.createElement('div');
-        wrap.style.marginTop = '8px';
-        wrap.innerHTML = `<div class="count" style="display:flex;justify-content:space-between">
-            <span>${esc(f.label)}</span><span class="cnt"></span></div>
-          <textarea rows="${f.name === 'title' ? 2 : 5}"></textarea>`;
-        const ta = wrap.querySelector('textarea'), c = wrap.querySelector('.cnt');
-        ta.dataset.field = f.name;
-        ta.value = f.value;                                  // set as value, never parsed as HTML
-        const upd = () => { const n = ta.value.length;
-          c.textContent = `${n}/${f.limit}`; c.classList.toggle('over', n > f.limit); };
-        ta.addEventListener('input', upd); upd();
-        el.appendChild(wrap);
-      });
-      $('drafts').appendChild(el);
+    const d = await (await fetch('/api/presets')).json();
+    (d.presets || []).forEach(p => {
+      const o = document.createElement('option');
+      o.value = p.spec; o.textContent = p.label; o.dataset.hint = p.hint || '';
+      $('preset').appendChild(o);
     });
-    $('publishRow').classList.remove('hide');
-  } catch (e) { $('draftMsg').className = 'msg err'; $('draftMsg').textContent = String(e.message || e); }
-  finally { $('draft').disabled = false; }
+  } catch (e) { /* leave blank */ }
+}
+$('preset').onchange = e => {
+  const opt = e.target.selectedOptions[0];
+  if (opt && opt.value) {
+    $('spec').value = opt.value;
+    $('presetHint').textContent = opt.dataset.hint || '';
+  } else { $('presetHint').textContent = ''; }
 };
-$('publish').onclick = async () => {
-  const items = [...document.querySelectorAll('.draft')].map(el => ({
-    platform: el.dataset.platform,
-    values: Object.fromEntries([...el.querySelectorAll('textarea')].map(ta => [ta.dataset.field, ta.value])),
-  }));
-  $('publish').disabled = true;
-  $('pubResults').innerHTML = '<div class="msg">publishing…</div>';
+
+// --- Generate -------------------------------------------------------------
+$('gen').onclick = async () => {
+  const spec = $('spec').value.trim();
+  if (!spec) { $('genMsg').textContent = 'paste a spec URL or pick a preset'; $('genMsg').className='msg err'; return; }
+  $('gen').disabled = true;
+  $('genMsg').className = 'msg'; $('genMsg').textContent = 'fetching spec and generating…';
   try {
-    const d = await postJSON('/api/presence/publish', {proposals: items});
-    $('pubResults').innerHTML = d.results.map(r =>
-      `<div class="res"><span class="pill ${r.ok ? 'pass' : 'fail'}">${r.ok ? 'posted' : 'failed'}</span>
-       <b>${esc(r.label)}</b> <span class="note">${r.ok ? '' : esc(r.detail)}</span></div>`).join('');
-  } catch (e) { $('pubResults').innerHTML = `<div class="msg err">${esc(String(e.message || e))}</div>`; }
-  finally { $('publish').disabled = false; }
+    const r = await fetch('/api/generate', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({spec})});
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'generate failed');
+    currentServer = d.server;
+    $('genMsg').className = 'msg ok';
+    $('genMsg').textContent = `wrote ${d.server} — ${d.tools} tools (${d.writes} write tools)`;
+    resetChat();
+    $('chatPanel').classList.remove('hide');
+    $('verifyPanel').classList.remove('hide');
+    $('chatInput').focus();
+  } catch (e) {
+    $('genMsg').className = 'msg err';
+    $('genMsg').textContent = String(e.message || e);
+  } finally { $('gen').disabled = false; }
 };
-document.querySelectorAll('.prove').forEach(b => b.onclick = () => {
-  reset();
-  open('/api/presence/prove?platform=' + encodeURIComponent(b.dataset.platform));
-  $('results').scrollIntoView({behavior: 'smooth', block: 'nearest'});
+
+// --- Chat -----------------------------------------------------------------
+function bubble(kind, html) {
+  const el = document.createElement('div');
+  el.className = 'bubble ' + kind;
+  el.innerHTML = html;
+  $('messages').appendChild(el);
+  $('messages').scrollTop = $('messages').scrollHeight;
+  return el;
+}
+function resetChat() {
+  chatHistory = [];
+  $('messages').innerHTML = '';
+  $('toolsLoaded').textContent = '';
+  $('chatMsg').textContent = '';
+}
+$('chatReset').onclick = resetChat;
+
+function pretty(obj) {
+  try { return JSON.stringify(obj, null, 2); } catch { return String(obj); }
+}
+
+$('chatSend').onclick = () => sendChat();
+$('chatInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); sendChat(); }
 });
-document.querySelectorAll('.harden').forEach(b => b.onclick = () => {
-  reset();
-  open('/api/presence/repair?platform=' + encodeURIComponent(b.dataset.platform));
-});
+
+async function sendChat() {
+  const text = $('chatInput').value.trim();
+  if (!text) return;
+  if (!currentServer) { $('chatMsg').textContent = 'generate a server first'; $('chatMsg').className='msg err'; return; }
+  if (chatStream) { $('chatMsg').textContent = 'still thinking…'; return; }
+
+  $('chatInput').value = '';
+  bubble('user', esc(text));
+  const userMsg = {role:'user', content:text};
+  const sendHistory = [...chatHistory, userMsg];
+
+  $('chatSend').disabled = true;
+  $('chatMsg').textContent = 'thinking…'; $('chatMsg').className = 'msg';
+
+  // POST-then-SSE is unusual; use fetch + ReadableStream instead.
+  try {
+    const r = await fetch('/api/chat', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({server: currentServer, messages: sendHistory}),
+    });
+    if (!r.ok) { const d = await r.json().catch(()=>({})); throw new Error(d.error || `HTTP ${r.status}`); }
+    const reader = r.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    while (true) {
+      const {done, value} = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, {stream:true});
+      // SSE frames are separated by \n\n; each frame's payload is on `data: ` lines
+      let idx;
+      while ((idx = buf.indexOf('\n\n')) >= 0) {
+        const frame = buf.slice(0, idx); buf = buf.slice(idx + 2);
+        const payload = frame.split('\n').filter(l => l.startsWith('data:'))
+          .map(l => l.slice(5).trimStart()).join('\n');
+        if (payload) onChatEvent(JSON.parse(payload));
+      }
+    }
+  } catch (e) {
+    $('chatMsg').textContent = String(e.message || e); $('chatMsg').className='msg err';
+  } finally {
+    $('chatSend').disabled = false; chatStream = null;
+    if ($('chatMsg').className === 'msg') $('chatMsg').textContent = '';
+  }
+}
+
+function onChatEvent(d) {
+  if (d.type === 'tools_loaded') {
+    $('toolsLoaded').innerHTML = `${d.count} tools loaded: ` +
+      d.names.slice(0, 8).map(n => `<code>${esc(n)}</code>`).join(', ') +
+      (d.names.length > 8 ? ` <span>+${d.names.length-8} more</span>` : '');
+  } else if (d.type === 'text') {
+    bubble('assistant', esc(d.text));
+  } else if (d.type === 'tool_use') {
+    bubble('tool',
+      `<div class="head"><span class="pill pass">call</span> ${esc(d.name)}</div>` +
+      `<code>${esc(pretty(d.input))}</code>`);
+  } else if (d.type === 'tool_result') {
+    bubble(`tool ${d.is_error ? 'err' : ''}`,
+      `<div class="head"><span class="pill ${d.is_error ? 'fail' : 'pass'}">` +
+      `${d.is_error ? 'error' : 'result'}</span></div>` +
+      `<code>${esc(String(d.content).slice(0, 800))}</code>`);
+  } else if (d.type === 'done') {
+    chatHistory = d.messages;   // authoritative history from the server
+  } else if (d.type === 'error') {
+    $('chatMsg').textContent = d.message; $('chatMsg').className='msg err';
+  }
+}
+
+// --- Scan / Repair --------------------------------------------------------
+let scanStream = null, scanTools = {}, seen = 0, expected = 0;
+function resetScan() {
+  if (scanStream) { scanStream.close(); scanStream = null; }
+  scanTools = {}; seen = 0; expected = 0;
+  $('scanResults').innerHTML = '';
+  $('repairOut').classList.add('hide'); $('repairBody').innerHTML = '';
+  $('hero').classList.remove('on'); $('bar').style.width = '0';
+  $('scanMsg').textContent = ''; $('scanMsg').className = 'msg';
+}
+function toolBlock(name) {
+  if (scanTools[name]) return scanTools[name];
+  const el = document.createElement('div');
+  el.className = 'tool-scan';
+  el.innerHTML = `<h3>${esc(name)} <span class="pill pass" data-pill>running</span></h3><div data-body></div>`;
+  $('scanResults').appendChild(el);
+  scanTools[name] = el;
+  return el;
+}
+function onScanEvent(ev) {
+  const d = JSON.parse(ev.data);
+  if (d.type === 'start') {
+    $('hero').classList.add('on');
+    $('grade').textContent='·'; $('grade').className='grade';
+    $('stats').innerHTML = `scanning <b>${d.tools.length}</b> tools…`;
+  } else if (d.type === 'tool_start') { expected += d.checks; toolBlock(d.tool); }
+  else if (d.type === 'tool_skipped') {
+    const el = toolBlock(d.tool);
+    el.querySelector('[data-pill]').className='pill skip';
+    el.querySelector('[data-pill]').textContent='skipped';
+    el.querySelector('[data-body]').innerHTML = `<div class="msg">${esc(d.reason)}</div>`;
+  } else if (d.type === 'tool_inconclusive') {
+    const el = toolBlock(d.tool);
+    el.querySelector('[data-pill]').className='pill inc';
+    el.querySelector('[data-pill]').textContent='inconclusive';
+    el.querySelector('[data-body]').innerHTML = `<div class="msg">${esc(d.note)}</div>`;
+  } else if (d.type === 'finding') {
+    seen++;
+    if (expected) $('bar').style.width = Math.min(100, seen/expected*100) + '%';
+    if (d.verdict === 'pass') return;
+    const body = toolBlock(d.tool).querySelector('[data-body]');
+    const row = document.createElement('div');
+    row.className = 'find ' + d.verdict;
+    row.innerHTML = `<div class="v ${d.verdict}">${esc(d.verdict.replace('_',' ').toUpperCase())}</div>
+      <div><code class="mono">${esc(d.field)}</code> — ${esc(d.detail)}
+        <div class="msg"><b>sent</b> <code class="mono">${esc(JSON.stringify(d.payload))}</code></div>
+        <div class="msg"><b>got</b> <code class="mono">${esc(String(d.response).slice(0,160))}</code></div></div>`;
+    body.appendChild(row);
+  } else if (d.type === 'tool_done') {
+    const el = scanTools[d.tool]; if (!el) return;
+    const pill = el.querySelector('[data-pill]');
+    const failed = el.querySelectorAll('.find.silent_success, .find.crash').length;
+    pill.className = 'pill ' + (failed ? 'fail' : 'pass');
+    pill.textContent = failed ? `${failed} failing` : 'clean';
+  } else if (d.type === 'done') {
+    $('grade').textContent = d.grade; $('grade').className='grade ' + d.grade;
+    $('bar').style.width = '100%';
+    $('stats').innerHTML = `<b>${Math.round(d.pass_rate*100)}%</b> pass rate · ` +
+      `<b>${d.total_checks}</b> checks · ` +
+      (d.failures ? `<b>${d.failures}</b> failing` : 'no failures') +
+      (d.inconclusive ? ` · ${d.inconclusive} inconclusive` : '') +
+      (d.skipped ? ` · ${d.skipped} skipped` : '');
+    finishScan();
+  } else if (d.type === 'repair_start') {
+    $('repairOut').classList.remove('hide');
+    $('repairBody').innerHTML = '<div class="msg">scanning, then patching…</div>';
+  } else if (d.type === 'attempt') {
+    const diff = esc(d.diff).split('\n').map(l =>
+      l.startsWith('+') ? `<span class="add">${l}</span>` :
+      l.startsWith('-') ? `<span class="del">${l}</span>` : l).join('\n');
+    $('repairBody').insertAdjacentHTML('beforeend',
+      `<div class="tool-scan"><h3>attempt ${d.number}
+        <span class="pill ${d.kept ? 'pass' : 'skip'}">${d.kept ? 'kept' : 'rejected'}</span>
+        <span class="msg">→ ${esc(d.grade)} ${Math.round(d.pass_rate*100)}%</span></h3>
+        <pre class="diff">${diff}</pre></div>`);
+  } else if (d.type === 'repair_done') {
+    $('repairBody').insertAdjacentHTML('beforeend',
+      `<div class="msg"><b>${esc(d.before.grade)} ${Math.round(d.before.pass_rate*100)}%</b>
+       → <b>${esc(d.after.grade)} ${Math.round(d.after.pass_rate*100)}%</b>
+       ${d.fixed ? '· all checks passing' : '· some checks still failing'}</div>`);
+    finishScan();
+  } else if (d.type === 'error') { failScan(d.message); }
+}
+function finishScan() {
+  if (scanStream) { scanStream.close(); scanStream = null; }
+  $('scan').disabled = false; $('repair').disabled = false;
+}
+function failScan(msg) { $('scanMsg').textContent=msg; $('scanMsg').className='msg err'; finishScan(); }
+function openScan(url) {
+  $('scan').disabled=true; $('repair').disabled=true;
+  scanStream = new EventSource(url);
+  scanStream.onmessage = onScanEvent;
+  scanStream.onerror = () => { if (scanStream) failScan('connection to the scanner dropped'); };
+}
+$('scan').onclick = () => {
+  if (!currentServer) return failScan('generate a server first');
+  resetScan();
+  openScan(`/api/scan?source=${encodeURIComponent(currentServer)}&allow_writes=${$('writes').checked?1:0}`);
+};
+$('repair').onclick = () => {
+  if (!currentServer) return failScan('generate a server first');
+  resetScan();
+  openScan(`/api/repair?source=${encodeURIComponent(currentServer)}`);
+};
+
 loadKeys();
+loadPresets();
 </script>
 </body>
 </html>

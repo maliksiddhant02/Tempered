@@ -23,7 +23,7 @@ from pathlib import Path
 from .report import terminal
 from .scan import Report, scan
 
-MODEL = "claude-opus-5"
+MODEL = "claude-opus-4-7"
 MAX_ATTEMPTS = 2
 
 SYSTEM = """You repair MCP (Model Context Protocol) servers that fail conformance testing.
