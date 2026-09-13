@@ -174,7 +174,8 @@ pre.diff .add{color:var(--pass)}pre.diff .del{color:var(--fail)}
   </div>
 
   <div class="panel">
-    <h2>1 &nbsp;Describe your app</h2>
+    <h2>Or build your own</h2>
+    <p class="msg" style="margin:-4px 0 12px">Not building from scratch? Just click a preset above — it loads straight into the chat below. This panel is the alternative: describe a connector in English (or paste an OpenAPI spec) and Tempered writes it for you.</p>
     <div class="row">
       <textarea id="describe" rows="2"
         placeholder="e.g. A Slack poster that sends a message to a channel via webhook"></textarea>
@@ -194,7 +195,7 @@ pre.diff .add{color:var(--pass)}pre.diff .del{color:var(--fail)}
   </div>
 
   <div class="panel hide" id="chatPanel">
-    <h2>2 &nbsp;Chat with your agent</h2>
+    <h2>Chat with your agent</h2>
     <div class="tools-loaded" id="toolsLoaded"></div>
     <div id="messages"></div>
     <div class="chat-input">
@@ -208,7 +209,7 @@ pre.diff .add{color:var(--pass)}pre.diff .del{color:var(--fail)}
   </div>
 
   <details class="panel verify hide" id="verifyPanel">
-    <summary><b style="color:var(--fg)">3 &nbsp;Verify it works</b>. Run Tempered's adversarial suite against the server before you trust it.</summary>
+    <summary><b style="color:var(--fg)">Verify it works</b>. Run Tempered's adversarial suite against the server before you trust it.</summary>
     <div class="row" style="margin-top:12px">
       <button id="scan">Scan</button>
       <button id="repair" class="ghost">Repair</button>
@@ -420,8 +421,9 @@ async function sendChat() {
     while (true) {
       const {done, value} = await reader.read();
       if (done) break;
-      buf += decoder.decode(value, {stream:true});
-      // SSE frames are separated by \n\n; each frame's payload is on `data: ` lines
+      buf += decoder.decode(value, {stream:true}).replace(/\r/g, '');
+      // SSE frames are separated by a blank line (server sends CRLF, stripped
+      // above); each frame's payload is on its `data:` lines.
       let idx;
       while ((idx = buf.indexOf('\n\n')) >= 0) {
         const frame = buf.slice(0, idx); buf = buf.slice(idx + 2);
