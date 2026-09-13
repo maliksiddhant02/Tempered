@@ -1,18 +1,18 @@
 # Tempered
 
+**Watch the demo (2 min):** <https://drive.google.com/file/d/1_EZhllU0CSB0orJf7loM2FgGl_mzlbxu/view?usp=sharing>
+
+**Try it live:** <https://tempered.onrender.com/>
+
+The free tier sleeps after 15 minutes of inactivity; the first request wakes it
+and can take about 30 seconds.
+
+---
+
 Describe an API in plain English. Tempered writes an MCP server for it, hands the
 tools to a Claude-powered agent you can chat with, and tests every tool for the
 failure mode where servers accept broken input and reply as if it worked. We call
 that silent success. It is the reason agents lie about results that never happened.
-
-## Demo video
-
-*A two-minute walkthrough will be linked here once recorded.*
-
-Live deployment: <https://tempered.onrender.com/>
-
-The free tier sleeps after 15 minutes of inactivity; the first request wakes it
-and can take about 30 seconds.
 
 ## What Tempered does
 
