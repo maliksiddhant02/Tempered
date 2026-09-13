@@ -36,7 +36,8 @@ def terminal(report: Report, verbose: bool = False) -> str:
         summary = "  ".join(
             f"{_LABEL[v].lower()} {counts[v]}" for v in (PASS, SILENT_SUCCESS, CRASH, AMBIGUOUS) if v in counts
         )
-        out.append(f"  {tool.name}  [{tool.pass_rate * 100:.0f}%]  {summary}")
+        label = f"{tool.pass_rate * 100:.0f}%" if tool.scored else "no checks"
+        out.append(f"  {tool.name}  [{label}]  {summary}")
 
         if not tool.baseline_ok:
             out.append(f"      ! baseline: {tool.baseline_note}")
@@ -156,12 +157,16 @@ def to_json(report: Report) -> str:
         {
             "server": report.server,
             "grade": report.grade,
+            "gradable": report.gradable,
             "pass_rate": round(report.pass_rate, 4),
             "total_checks": report.total_checks,
+            "inconclusive": len(report.inconclusive),
+            "skipped": sum(1 for t in report.tools if t.skipped),
             "tools": [
                 {
                     "name": t.name,
                     "pass_rate": round(t.pass_rate, 4),
+                    "gradable": t.gradable,
                     "baseline_ok": t.baseline_ok,
                     "skipped": t.skipped,
                     "findings": [

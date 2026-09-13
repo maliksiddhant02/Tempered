@@ -87,14 +87,22 @@ class ToolReport:
         return sum(1 for f in scored if f.verdict == PASS) / len(scored)
 
     @property
-    def scanned(self) -> bool:
-        """Did this tool produce a result worth grading?
+    def scored(self) -> int:
+        """Findings that actually count — everything but AMBIGUOUS."""
+        return sum(1 for f in self.findings if f.verdict != AMBIGUOUS)
 
-        A tool that rejects its own valid example is not being strict, it is
-        broken or unreachable — and it would otherwise score 100% for rejecting
-        everything we sent. Refusing to grade it is the honest answer.
-        """
+    @property
+    def scanned(self) -> bool:
+        """Reachable and called: not skipped, accepted its own valid example."""
         return not self.skipped and self.baseline_ok
+
+    @property
+    def gradable(self) -> bool:
+        """Contributes to the grade. Reachable is not enough — a tool with no
+        constraints to violate (0 checks, or all AMBIGUOUS) would otherwise
+        inject a vacuous 100%. It must have run at least one scored check.
+        """
+        return self.scanned and self.scored > 0
 
 
 @dataclass
@@ -104,7 +112,7 @@ class Report:
 
     @property
     def pass_rate(self) -> float:
-        rates = [t.pass_rate for t in self.tools if t.scanned]
+        rates = [t.pass_rate for t in self.tools if t.gradable]
         return sum(rates) / len(rates) if rates else 1.0
 
     @property
@@ -113,7 +121,7 @@ class Report:
 
     @property
     def gradable(self) -> bool:
-        return any(t.scanned for t in self.tools)
+        return any(t.gradable for t in self.tools)
 
     @property
     def grade(self) -> str:

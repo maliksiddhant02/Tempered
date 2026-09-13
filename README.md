@@ -175,9 +175,10 @@ test_tempered.py    end-to-end self-check
 
 Built at a hackathon. `test`, `generate`, `serve`, and the scan engine are
 verified end-to-end against both fixtures and a live third-party API, through the
-CLI and through the browser. The `repair` loop's
-model call is **not yet live-tested** — it was written against the current
-Anthropic SDK but no API key was available in the build environment.
+CLI and through the browser. The `repair` loop is **verified live**: pointed at
+the broken fixture (F, 18 silent successes) it returns an **A in one attempt**,
+enforcing the declared schema in the handler rather than loosening it, and prints
+the patch diff for every attempt.
 
 Known limits: OpenAPI only (GraphQL and recorded traffic are the obvious next
 ingest paths), single-call tools only (no create-then-read sequences), and no

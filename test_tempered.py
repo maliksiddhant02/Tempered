@@ -51,7 +51,15 @@ def check_grading() -> None:
     assert grade_for(1.0) == "A" and grade_for(0.0) == "F"
     assert grade_for(0.86) == "B" and grade_for(0.5) == "D"
     assert meets("A", "B") and not meets("C", "B")
-    print("  grading          bands and thresholds")
+
+    # Reachable is not graded: a tool with no constraints to violate (0 scored
+    # checks) must not produce a grade. Regression — it once scored a vacuous A.
+    from tempered.scan import Report, ToolReport
+    empty = ToolReport(name="noop", description="", baseline_ok=True, baseline_note="")
+    assert not empty.gradable, "0-check tool counted as gradable"
+    vacuous = Report(server="x", tools=[empty])
+    assert not vacuous.gradable and vacuous.grade == "?", f"vacuous server graded {vacuous.grade}"
+    print("  grading          bands, thresholds, no vacuous A")
 
 
 async def check_fixtures() -> None:
