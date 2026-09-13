@@ -1,176 +1,111 @@
 # Tempered — Plan
 
-*(tempering: heat it, test it, harden it -- a tool is not finished until it has been proven)*
+*(tempering: heat it, test it, harden it — a tool is not finished until it has been proven)*
 
 ## What it is
 
-An agent that builds MCP servers for other apps, proves they work, and then uses
-them. Point it at an API's OpenAPI spec: it generates a working MCP server, runs
-an adversarial eval suite against every tool, repairs what fails (bounded at two
-attempts), and publishes it with a pass rate. Do that for three apps, then let an
-agent complete one real task spanning all three.
+A multi-step agent that keeps your professional presence up to date across your
+apps — running on MCP connectors that Tempered generates and **proves** before
+the agent is allowed to use them.
+
+Two halves, one story:
+
+- **The agent** (`presence/`) — tell it what's new; it drafts a post tailored to
+  each platform, waits for your confirmation, and publishes. Discord, Slack,
+  GitHub, Notion. BYO keys.
+- **The engine** (`tempered/`) — generate a connector from an API spec, fire an
+  adversarial conformance suite at it, and repair what fails. This is how you know
+  the connectors work: proof, not screenshots.
+
+"Teach the fisherman to fish": the agent can reach *any* app, because Tempered
+builds and hardens the connector for it.
 
 ## One-liner
 
-> Most MCP servers return success on malformed input, so agents fail silently.
-> This one builds them *and* proves they work before shipping.
+> An agent that keeps your presence current across your apps — over connectors it
+> proves before it trusts.
 
 ## The brief, answered
 
 | Requirement | How |
 |---|---|
-| One useful, multi-step AI agent | The generate -> eval -> repair -> publish loop. Real agent loop, real failure handling |
-| Connect to >= 3 external apps | Stripe (test mode), Slack, Linear |
-| Show how you know it works | The eval suite. Per-tool pass rates, not claims |
-
-The third requirement is the whole product, not a closing slide. That is the
-differentiator.
+| One useful, multi-step AI agent | draft-per-platform → confirm → publish → (help reply). A real tool-use loop over MCP connectors. |
+| Connect to ≥ 3 external apps | Discord, Slack, GitHub, Notion. |
+| Show how you know it works | Tempered grades every connector and repairs the failing ones. |
 
 ## Judging criteria
 
-| Criterion | Weight | Est. | What earns it |
-|---|---|---|---|
-| Technical execution | 30% | 8 | Generator + eval + repair loop + three live integrations |
-| Reliability & evaluation | 25% | 9 | The eval suite *is* the product |
-| Usefulness | 20% | 8 | Every agent dev with an unwrapped API; cross-app task makes it concrete |
-| Originality | 15% | 7 | Capped: generation is commodity, eval-gated publishing is the fresh part |
-| Demo clarity | 10% | 8 | One story, but three apps is a lot of narrative for 3 min |
-| **Weighted** | | **8.10/10** | |
-
-### One lever per criterion
-
-- **Technical execution (30%)** — Derive bad payloads *from the schema*, never
-  hardcode them. Walk the JSON Schema, synthesize a violation per constraint:
-  wrong type, out-of-enum, missing required, out-of-bounds, bad format, extra
-  keys. A fixed list of five bad inputs is a script; this is a system. Say
-  "schema-directed" out loud in the demo.
-- **Reliability (25%)** — We grade our own homework and judges discount that.
-  Two cheap fixes: run the suite against one *hand-written* MCP server (not
-  ours), and ship a **known-good control** the harness passes cleanly, proving it
-  does not just flag everything.
-- **Usefulness (20%)** — CLI with an exit code, not a web app.
-  `npx tempered test ./server --fail-under B` returning nonzero is adoptable Monday.
-- **Originality (15%)** — Name the defect class. "**Silent success**" is what a
-  judge repeats in deliberation. Do not oversell the generator; anyone who knows
-  FastMCP will discount it.
-- **Demo clarity (10%)** — Pre-generate apps #2 and #3. Only app #1 generates
-  live, so a cold API cannot sink the demo.
+| Criterion | Weight | What earns it |
+|---|---|---|
+| Technical execution | 30% | Agent loop + MCP client + generate + schema-directed eval + bounded repair, all wired into one UI. |
+| Reliability & evaluation | 25% | The eval engine *is* the proof. Known-good controls, unscored ambiguity, no vacuous grades. The strongest half. |
+| Usefulness | 20% | A real chore (keeping profiles/updates current) done by an agent; BYO keys; adopts today. |
+| Originality | 15% | Naming and catching **silent success**, and doing it on the agent's *own* connectors — proving before trusting. |
+| Demo clarity | 10% | One 2-minute arc: agent publishes → prove F → harden to A. See [DEMO.md](DEMO.md). |
 
 ## How it works
 
 ```
-OpenAPI spec
-    |
-    v
-[1] Generate      tool schemas + handlers (FastMCP from_openapi as the base)
-    |
-    v
-[2] Eval          schema-directed adversarial suite, every tool
-    |
-    +-- pass --> [4] Publish with pass rate
-    |
-    v
-[3] Repair        patch schema or handler, re-run. Max 2 attempts, then mark failed
+What's new ──▶ agent drafts per platform ──▶ you confirm ──▶ publish
+                                                              │
+each connector is:  API spec ──generate──▶ MCP connector ──prove──▶ grade
+                                                              └─ F? ──repair──▶ A
 ```
 
-## Architecture
+- **Silent success** — a connector returns success for input its own declared
+  schema forbids. The agent proceeds on garbage; nothing reaches monitoring.
+- **Schema-directed synthesis** — one payload per declared constraint, each
+  violating exactly one thing, so every failure is attributable and repairable.
+- **The oracle** — PASS / SILENT_SUCCESS / CRASH / AMBIGUOUS, banded to A–F.
+- **Repair** — bounded at two attempts, re-runs the full suite, keeps a patch only
+  if it scores better, and never leaves a broken file behind.
 
-Four components, deliberately small:
+## The four apps
 
-| Component | Does | Notes |
-|---|---|---|
-| `generate` | OpenAPI -> MCP server | Wraps FastMCP `from_openapi()`. Do not rebuild this |
-| `eval` | Adversarial suite over a live server | The real engineering. Schema-directed payload synthesis + protocol client (stdio + HTTP) |
-| `repair` | Failure -> patch -> re-run | Bounded at 2. Emits a visible diff |
-| `report` | One page, per-server grade + per-check detail | Not a registry. One page |
+Chosen for open, key/webhook auth — the "easy external apps", not an OAuth dance.
 
-### What the eval suite checks
+- **Discord**, **Slack** — incoming webhook, generated connectors.
+- **GitHub** — token, generated connector (open an issue: title + body).
+- **Notion** — token, hand-written connector (append to a page); it validates its
+  schema, so it's the **positive control** (A) beside the generated ones.
 
-| Check | Catches | LLM needed |
-|---|---|---|
-| Silent success | Malformed payload returns content with no `isError`. Agent believes it worked. **Headline finding** | No |
-| Schema/handler drift | Declared `required` field the handler ignores; declared types never enforced | No |
-| Error surfacing | Upstream 4xx/5xx arrives as a cheerful string instead of an MCP error | No |
-| Type coercion | `"5"` vs `5`, null vs missing, empty array, extra keys | No |
-| Describability | Can a model pick the right tool from descriptions alone, with distractors? Nobody tests this | Yes |
-| Side-effect labeling | Does a destructive tool announce itself before an agent calls it? | No |
+Closed platforms (LinkedIn, Seek, Prosple) have no write API — the agent drafts
+and hands you the text rather than pretending to auto-post.
 
-Four of six need no LLM: deterministic, fast, safe to run live on stage.
+## What proving them found
 
-## The three apps
+FastMCP's `from_openapi` connectors **don't enforce their declared schemas** — so
+Discord/Slack/GitHub score **F** (walls of silent successes), and Notion (which
+validates) scores **A**. That contrast is the demo: Tempered tells you which
+connectors to trust, and `repair` hardens a failing one **F → A** in one attempt,
+after which the agent still publishes valid input through it.
 
-Chosen on **auth simplicity**, not brand recognition. An OAuth dance will eat the
-hackathon.
+## Build order (what shipped)
 
-- **Stripe** (test mode) — safe real writes against a real API, kills the
-  mock-data penalty outright
-- **Slack** — clean token auth
-- **Linear** — clean token auth
-
-Swap candidates if auth fights back: GitHub, Todoist, Resend, Airtable.
-
-Cross-app task: *payment fails in Stripe -> open a Linear issue with customer
-details -> post the thread to Slack.* One sentence, obviously useful, visibly
-multi-step.
-
-## Build order
-
-1. **Eval suite** — schema-directed payload synthesis + MCP protocol client
-2. **Generator** — OpenAPI in, server out, via FastMCP
-3. **Repair loop** — bounded at 2, emits a visible diff
-4. **App #1 end to end** — generate, fail, repair, pass, agent calls it
-5. **Apps #2 and #3**
-6. **Report page + CLI exit codes**
-7. **Describability judge** — only from leftover time
-
-### The floor
-
-**A credible entry stops at step 4.** One app generated, failed, repaired,
-passing, and called by an agent is a complete story. Three shallow integrations
-lose to one deep one plus two that merely work.
-
-### Hour allocation
-
-Allocate to weight, not enthusiasm:
-
-- **50%** generator + schema-directed eval suite *(the 55% of score that decides this)*
-- **20%** repair loop + known-good control
-- **15%** the three integrations
-- **15%** CLI packaging + demo rehearsal
-
-## Demo script (3 min)
-
-1. Paste the Stripe spec. Server generates. **Tools fail red.** Repair runs.
-   **Green.** Show the patch diff on screen -- red/green is a light, the diff is
-   engineering.
-2. Slack and Linear already sitting in the report with pass rates (pre-generated).
-3. Agent runs one task through all three: payment fails -> Linear issue -> Slack post.
-
-No slides before the terminal.
+1. Engine: synth + oracle + generate + report + CLI + web UI. *(done earlier)*
+2. Repair loop, proven live F → A on the fixture.
+3. Presence agent: plan/publish with the confirmation gate.
+4. Connectors: Discord, Slack (webhook), GitHub (issue), Notion (page).
+5. "Prove this connector" in the UI (scan against a safe sink).
+6. Repair-close: "Harden" a connector F → A from the UI.
 
 ## Out of scope
 
-Cut without hesitation. None of it touches any of the five criteria:
-
-- Registry infrastructure (a catalogue scores zero and eats days)
-- Non-technical onboarding UX (ease of use is a feature, not a moat; the persona
-  cannot get API credentials anyway)
-- Docs-page and CLI `--help` input inference (LLM-flaky, zero extra points)
-- Any input source beyond OpenAPI
-- Auth, accounts, persistence
+- OAuth flows; closed-platform auto-posting (draft-and-hand-off instead).
+- Multi-call tool sequences (create-then-read).
+- A registry / catalogue.
 
 ## Risks
 
 | Risk | Mitigation |
 |---|---|
-| Scope: four components + three apps is wide | Hold the floor at step 4. Apps #2/#3 are additive, never blocking |
-| Live LLM generation is slow and nondeterministic on stage | Only app #1 generates live. Pre-generate the rest |
-| An API that generates cleanly first try = no story | Pick a spec verified to fail the first pass. Seed the failure |
-| Judges discount self-graded evals | Known-good control + test one hand-written third-party server |
-| "You just wrapped FastMCP" | Lead with the eval suite, not the generator. The generator is a dependency, not the pitch |
+| Live third-party posting flakes on stage | Only Discord needs to post live; prove/harden run fully offline against a local sink. |
+| Repair is a model call (nondeterministic) | Bounded at 2, keeps only improvements, restores on any bad candidate. Rehearse it once before the demo. |
+| "You just wrapped FastMCP" | Lead with the eval engine and the F→A repair, not the generator. |
+| Connectors already hardened before the demo | They ship at F; `git checkout presence/connectors` resets them. |
 
 ## Positioning
 
-The moat is not "easy", it is **verified**. Do not pitch accessibility -- pitch
-proof. The audience is the competent developer who is not an MCP expert and has
-an internal API to expose, not a non-technical user.
+The moat is not "easy", it is **proven**. The pitch is an agent you can trust
+across your apps — because every connector under it was tested and hardened, not
+assumed.
